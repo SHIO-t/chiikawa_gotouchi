@@ -1,0 +1,25 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Firebase
+.firebase/
+# .firebaserc はチームで共有するならコメントアウトして管理
+# .firebaserc
+
+# VSCode
+.vscode/
+.vscode/settings.json
+
+# Mac
+.DS_Store
+
+# Logs
+*.log
+
+# Env (もしAPIキーや秘密情報を置く場合)
+.env
+.env.local
