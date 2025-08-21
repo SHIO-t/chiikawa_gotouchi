@@ -2,7 +2,8 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>ちいかわ ご当地キーホルダー 所持チェック</title>
+  <title>ちいかわ ご当地キーホルダー 所持チェック（家族共有・Googleログイン）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root{--bg:#0f172a;--panel:#111827;--muted:#94a3b8;--text:#e5e7eb;--accent:#22d3ee;--accent2:#a78bfa;--ok:#34d399}
     body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Noto Sans JP,Meiryo,sans-serif;background:#0b1225;color:var(--text)}
@@ -23,33 +24,28 @@
     .ok{color:#10b981}
     .warn{color:#f59e0b}
     .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px}
+    .hide{display:none}
   </style>
 </head>
 <body>
 <header class="wrap">
   <h1>ちいかわ ご当地キーホルダー 所持チェック</h1>
   <div id="stats" class="small"></div>
-  <div class="wrap row">
+
+  <div class="wrap row" style="margin-bottom:6px">
     <button id="btnPrint">一覧を表示/印刷</button>
     <button id="btnCSVAll">CSV (全件)</button>
-    <button id="btnToggleCfg" class="ghost">Firebase設定</button>
     <span class="small" style="opacity:.85">地域→都道府県→名称で出力</span>
   </div>
-  <div class="panel wrap" id="cfgPanel" style="display:none">
-    <div class="row">
-      <input id="cfgApiKey" placeholder="apiKey" class="grow" style="min-width:280px">
-      <input id="cfgAuthDomain" placeholder="authDomain (xxx.firebaseapp.com)" class="grow" style="min-width:280px">
-      <input id="cfgProjectId" placeholder="projectId" class="grow" style="min-width:220px">
-    </div>
-    <div class="row">
-      <textarea id="cfgJson" placeholder='JSON貼り付け可 {"apiKey":"...","authDomain":"...","projectId":"..."}' style="width:100%;min-height:90px"></textarea>
-    </div>
-    <div class="row">
-      <button id="cfgSave">保存して再読み込み</button>
-      <button id="cfgClear" class="ghost">設定を削除</button>
-      <span id="cfgStatus" class="small"></span>
-    </div>
+
+  <!-- 認証UI -->
+  <div class="wrap row" id="authRow">
+    <button id="loginBtn" class="ghost">Googleでログイン</button>
+    <button id="logoutBtn" class="ghost hide">ログアウト</button>
+    <span id="userInfo" class="small"></span>
   </div>
+
+  <!-- 家族コード＋同期UI -->
   <div class="wrap row" style="margin-top:6px">
     <input id="familyCode" placeholder="家族コード（例: my-family）" style="min-width:220px">
     <button id="connectBtn" class="ghost">同期オン</button>
@@ -57,18 +53,28 @@
     <span id="syncStatus" class="small">未接続</span>
   </div>
 </header>
+
 <main class="wrap" id="app"></main>
 
-<!-- Firebase SDK を ES Modules で読み込み -->
+<!-- Firebase SDK を ES Modules で読み込み（v10系） -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js';
+import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js';
 import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js';
 
-/* --- この中にアプリ全体の処理 --- */
 (()=>{
-  const LS_KEY='chiikawa-keyholders-v10';
-  const CFG_KEY=LS_KEY+'__fb_cfg';
+  /* ===== 固定Firebase設定（設定パネルは不要） ===== */
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyC66I66AmKfZFIyIKX_TXBSRTIsR2IDEDE",
+    authDomain: "chiikawa-gotouchi-project.firebaseapp.com",
+    projectId: "chiikawa-gotouchi-project",
+    storageBucket: "chiikawa-gotouchi-project.appspot.com",
+    messagingSenderId: "602616418153",
+    appId: "1:602616418153:web:e73e4de1bf4942ee16b7f8"
+  };
+
+  /* ===== アプリ内状態 ===== */
+  const LS_KEY='chiikawa-keyholders-v11';
   const FAMILY_KEY=LS_KEY+'__family';
   const REGION_ORDER=["北海道地方","東北地方","関東地方","中部地方","近畿地方","中国地方","四国地方","九州地方","海外","その他"];
   const FULL=[
@@ -108,34 +114,72 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     {region:"その他",pref:"JR西日本",name:"N700S"},
     {region:"その他",pref:"空港",name:"インパクト"}
   ];
-
-  function today(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+  function today(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
   function normalize(x){return{region:String(x.region||''),pref:String(x.pref||''),name:String(x.name||''),owned:!!x.owned,ownedAt:x.ownedAt||null}}
   function load(){try{const a=JSON.parse(localStorage.getItem(LS_KEY));if(Array.isArray(a))return a.map(normalize);return null}catch{return null}}
   let items=load()||FULL.map(x=>normalize(x));
   function save(){localStorage.setItem(LS_KEY,JSON.stringify(items)); if(fb.connected && !fb.applying) pushToCloudDebounced();}
 
+  /* ===== UI要素 ===== */
   const app=document.getElementById('app');
   const btnPrint=document.getElementById('btnPrint');
   const btnCSVAll=document.getElementById('btnCSVAll');
-  const btnToggleCfg=document.getElementById('btnToggleCfg');
-  const cfgPanel=document.getElementById('cfgPanel');
-  const cfgApiKey=document.getElementById('cfgApiKey');
-  const cfgAuthDomain=document.getElementById('cfgAuthDomain');
-  const cfgProjectId=document.getElementById('cfgProjectId');
-  const cfgJson=document.getElementById('cfgJson');
-  const cfgSave=document.getElementById('cfgSave');
-  const cfgClear=document.getElementById('cfgClear');
-  const cfgStatus=document.getElementById('cfgStatus');
   const familyCodeInput=document.getElementById('familyCode');
   const connectBtn=document.getElementById('connectBtn');
   const disconnectBtn=document.getElementById('disconnectBtn');
   const syncStatus=document.getElementById('syncStatus');
+  const loginBtn=document.getElementById('loginBtn');
+  const logoutBtn=document.getElementById('logoutBtn');
+  const userInfo=document.getElementById('userInfo');
 
-  /* ==================== 表表示 / CSV 用ユーティリティ ==================== */
+  /* ===== Firebase 初期化・認証 ===== */
+  const fb={app:null,auth:null,db:null,docRef:null,unsub:null,connected:false,applying:false,uid:null};
+  fb.app = initializeApp(FIREBASE_CONFIG);
+  fb.auth = getAuth(fb.app);
+  fb.db = getFirestore(fb.app);
+
+  const provider = new GoogleAuthProvider();
+
+  loginBtn.addEventListener('click', async () => {
+    try{
+      await signInWithPopup(fb.auth, provider);
+    }catch(e){
+      console.error('login error', e);
+      setStatus('ログイン失敗', 'warn');
+      alert('ログインに失敗しました: ' + (e.code || e.message));
+    }
+  });
+  logoutBtn.addEventListener('click', async () => {
+    try{
+      await signOut(fb.auth);
+    }catch(e){
+      console.error('logout error', e);
+    }
+  });
+
+  onAuthStateChanged(fb.auth, (u) => {
+    fb.uid = u ? u.uid : null;
+    if(u){
+      loginBtn.classList.add('hide');
+      logoutBtn.classList.remove('hide');
+      userInfo.textContent = `ログイン中: ${u.email||u.uid}`;
+      setStatus('ログイン済み');
+      // ローカルに保存してた家族コードを復元
+      const saved = localStorage.getItem(FAMILY_KEY)||'';
+      if(saved && !familyCodeInput.value) familyCodeInput.value = saved;
+    }else{
+      loginBtn.classList.remove('hide');
+      logoutBtn.classList.add('hide');
+      userInfo.textContent = '';
+      setStatus('未接続');
+      // 切断
+      disconnect();
+    }
+  });
+
+  /* ===== 表/CSVユーティリティ ===== */
   const by = k => (a,b)=> (a[k]||'').localeCompare(b[k]||'', 'ja');
   function sortForOutput(arr){
-    // 地域→都道府県→名称（地域は定義順優先）
     return [...arr].sort((a,b)=>{
       const ra=(REGION_ORDER.indexOf(a.region)+1)||999;
       const rb=(REGION_ORDER.indexOf(b.region)+1)||999;
@@ -146,7 +190,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
   function toCSV(data){
     const header=['地域','都道府県','名称','所持','所持日'];
     const rows=data.map(x=>[x.region,x.pref,x.name,x.owned?1:0,x.ownedAt||''].map(csvCell).join(','));
-    return [header.join(','),...rows].join('\n');
+    return ['\ufeff'+header.join(','),...rows].join('\n'); // BOM付き（Excel対策）
   }
   function downloadBlob(filename, text, mime='text/csv;charset=utf-8;'){
     const blob=new Blob([text],{type:mime});
@@ -160,12 +204,10 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     downloadBlob(filename, csv);
   }
 
-  /* ====== Live Server 対策版：document.writeもインライン<script>も使わない ====== */
   function openPrintAll() {
     const data = sortForOutput(items);
     const win = window.open('about:blank', '_blank', 'noopener');
     if (!win) { alert('ポップアップがブロックされています。許可してください。'); return; }
-
     const css = `
       :root{--text:#111;--border:#e5e7eb}
       body{font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Noto Sans JP,Meiryo,sans-serif;color:var(--text);margin:0;background:#fff}
@@ -180,126 +222,73 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
       button{padding:8px 12px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer}
       @media print{#printBtn{display:none}}
     `;
-
     const build = () => {
       const doc = win.document;
       doc.title = 'ちいかわ 一覧';
-
-      // head
-      const style = doc.createElement('style');
-      style.textContent = css;
-      doc.head.appendChild(style);
-
-      // body
-      const wrap = doc.createElement('div');
-      wrap.className = 'wrap-n';
-      doc.body.appendChild(wrap);
-
-      const h2 = doc.createElement('h2');
-      h2.textContent = 'ちいかわ ご当地キーホルダー 一覧';
-      wrap.appendChild(h2);
-
-      const table = doc.createElement('table');
-      table.className = 'pretty';
-      const thead = doc.createElement('thead');
-      const trh = doc.createElement('tr');
-      ['地域','都道府県','名称','所持','所持日'].forEach(t => {
-        const th = doc.createElement('th'); th.textContent = t; trh.appendChild(th);
-      });
-      thead.appendChild(trh);
-      table.appendChild(thead);
-
+      const style = doc.createElement('style'); style.textContent = css; doc.head.appendChild(style);
+      const wrap = doc.createElement('div'); wrap.className = 'wrap-n'; doc.body.appendChild(wrap);
+      const h2 = doc.createElement('h2'); h2.textContent = 'ちいかわ ご当地キーホルダー 一覧'; wrap.appendChild(h2);
+      const table = doc.createElement('table'); table.className='pretty';
+      const thead = doc.createElement('thead'); const trh = doc.createElement('tr');
+      ['地域','都道府県','名称','所持','所持日'].forEach(t=>{const th=doc.createElement('th'); th.textContent=t; trh.appendChild(th);});
+      thead.appendChild(trh); table.appendChild(thead);
       const tbody = doc.createElement('tbody');
-      if (data.length === 0) {
-        const tr = doc.createElement('tr');
-        const td = doc.createElement('td'); td.colSpan = 5; td.textContent = 'データがありません';
-        tr.appendChild(td); tbody.appendChild(tr);
-      } else {
-        data.forEach(x => {
-          const tr = doc.createElement('tr');
-          const td1 = doc.createElement('td'); td1.textContent = x.region;
-          const td2 = doc.createElement('td'); td2.textContent = x.pref;
-          const td3 = doc.createElement('td'); td3.textContent = x.name;
-          const td4 = doc.createElement('td'); td4.style.textAlign = 'center';
-          const badge = doc.createElement('span'); badge.className = 'b ' + (x.owned ? 'yes' : 'no');
-          badge.textContent = x.owned ? '所持' : '未所持'; td4.appendChild(badge);
-          const td5 = doc.createElement('td'); td5.textContent = x.ownedAt || '';
-          tr.append(td1, td2, td3, td4, td5);
-          tbody.appendChild(tr);
+      if(data.length===0){
+        const tr=doc.createElement('tr'); const td=doc.createElement('td'); td.colSpan=5; td.textContent='データがありません'; tr.appendChild(td); tbody.appendChild(tr);
+      }else{
+        data.forEach(x=>{
+          const tr=doc.createElement('tr');
+          const td1=doc.createElement('td'); td1.textContent=x.region;
+          const td2=doc.createElement('td'); td2.textContent=x.pref;
+          const td3=doc.createElement('td'); td3.textContent=x.name;
+          const td4=doc.createElement('td'); td4.style.textAlign='center'; const badge=doc.createElement('span'); badge.className='b '+(x.owned?'yes':'no'); badge.textContent=x.owned?'所持':'未所持'; td4.appendChild(badge);
+          const td5=doc.createElement('td'); td5.textContent=x.ownedAt||'';
+          tr.append(td1,td2,td3,td4,td5); tbody.appendChild(tr);
         });
       }
-      table.appendChild(tbody);
-      wrap.appendChild(table);
-
-      const btnBox = doc.createElement('div');
-      btnBox.style.textAlign = 'right';
-      btnBox.style.marginTop = '10px';
-      const printBtn = doc.createElement('button');
-      printBtn.id = 'printBtn';
-      printBtn.textContent = '🖨️ 印刷';
-      printBtn.addEventListener('click', () => win.print());
-      btnBox.appendChild(printBtn);
-      wrap.appendChild(btnBox);
+      table.appendChild(tbody); wrap.appendChild(table);
+      const btnBox = doc.createElement('div'); btnBox.style.textAlign='right'; btnBox.style.marginTop='10px';
+      const printBtn = doc.createElement('button'); printBtn.id='printBtn'; printBtn.textContent='🖨️ 印刷'; printBtn.addEventListener('click', ()=>win.print());
+      btnBox.appendChild(printBtn); wrap.appendChild(btnBox);
     };
-
-    if (win.document.readyState === 'complete') build();
-    else win.addEventListener('load', build);
+    if (win.document.readyState === 'complete') build(); else win.addEventListener('load', build);
   }
 
-  /* ==================== イベント紐付け ==================== */
   btnPrint.addEventListener('click', openPrintAll);
   btnCSVAll.addEventListener('click', ()=>exportCSV(items,'chiikawa_all.csv'));
 
-  if (btnToggleCfg && cfgPanel) {
-    btnToggleCfg.addEventListener('click', () => {
-      const hidden = getComputedStyle(cfgPanel).display === 'none';
-      cfgPanel.style.display = hidden ? 'block' : 'none';
-    });
-  }
+  /* ===== ステータス表示 ===== */
+  function setStatus(t,cls=''){ syncStatus.textContent=t; syncStatus.className='small '+cls; }
 
-  /* ==================== Firebase関連 ==================== */
-  const fb={app:null,auth:null,db:null,docRef:null,unsub:null,connected:false,applying:false,uid:null};
-  const SAVED_CFG = JSON.parse(localStorage.getItem(CFG_KEY)||'{}');
-  if(SAVED_CFG.apiKey){
-    cfgApiKey.value=SAVED_CFG.apiKey||'';
-    cfgAuthDomain.value=SAVED_CFG.authDomain||'';
-    cfgProjectId.value=SAVED_CFG.projectId||'';
-    cfgStatus.textContent='保存済みの設定を使用中';
-  }
-  cfgSave.addEventListener('click',()=>{
-    let cfg=null;
-    const txt=cfgJson.value.trim();
-    if(txt){ try{ cfg=JSON.parse(txt);}catch(e){ return alert('JSONが不正です'); } }
-    cfg = cfg || { apiKey: cfgApiKey.value.trim(), authDomain: cfgAuthDomain.value.trim(), projectId: cfgProjectId.value.trim() };
-    if(!cfg.apiKey||!cfg.authDomain||!cfg.projectId) return alert('apiKey/authDomain/projectId を入力してください');
-    localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
-    location.reload();
-  });
-  cfgClear.addEventListener('click',()=>{ localStorage.removeItem(CFG_KEY); location.reload(); });
-  const FIREBASE_CONFIG = JSON.parse(localStorage.getItem(CFG_KEY)||'{}');
+  /* ===== Firestore 同期（家族コード付き） ===== */
+  const savedFamily = localStorage.getItem(FAMILY_KEY)||'';
+  if(savedFamily) familyCodeInput.value = savedFamily;
 
-  function setStatus(t,cls=''){syncStatus.textContent=t;syncStatus.className='small '+cls}
-
-  function ensureFirebase(){
-    if(!FIREBASE_CONFIG.apiKey||!FIREBASE_CONFIG.projectId){ setStatus('設定未入力','warn'); return false; }
-    if(!fb.app){
-      fb.app = initializeApp(FIREBASE_CONFIG);
-      fb.auth = getAuth(fb.app);
-      fb.db = getFirestore(fb.app);
-      onAuthStateChanged(fb.auth,u=>{fb.uid=u?u.uid:null});
+  function ensureLoggedIn(){
+    if(!fb.auth.currentUser){
+      alert('まず Google でログインしてください。');
+      return false;
     }
     return true;
   }
 
+  function showError(prefix, e){
+    console.error(prefix, e);
+    const msg = (e && (e.code || e.message)) ? ` (${e.code || e.message})` : '';
+    setStatus(`エラー${msg}`, 'warn');
+  }
+
   function connect(){
+    if(!ensureLoggedIn()) return;
     const code=(familyCodeInput.value||'').trim();
     if(!code) return alert('家族コードを入力してください。');
-    if(!ensureFirebase()) return;
     setStatus('接続中…');
-    signInAnonymously(fb.auth).then(async()=>{
-      localStorage.setItem(FAMILY_KEY, code);
-      fb.docRef = doc(getFirestore(fb.app),'families', code,'lists','default');
-      const snap = await getDoc(fb.docRef);
+    localStorage.setItem(FAMILY_KEY, code);
+
+    fb.docRef = doc(fb.db,'families', code,'lists','default');
+
+    // 初回読み込み
+    getDoc(fb.docRef).then(async (snap)=>{
       if(snap.exists()){
         fb.applying=true;
         const remote=(snap.data().items||[]).map(normalize);
@@ -310,16 +299,23 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
       }else{
         await setDoc(fb.docRef,{items, updatedAt: Date.now()});
       }
+      // リアルタイム購読
       if(fb.unsub) fb.unsub();
       fb.unsub = onSnapshot(fb.docRef, s=>{
         if(!s.exists()) return;
         const remote=(s.data().items||[]).map(normalize);
         fb.applying=true; items = mergeItems(remote, items); save(); fb.applying=false; render();
-      });
+      }, e=>showError('onSnapshot失敗', e));
+
       fb.connected=true; setStatus('同期中','ok');
-    }).catch(e=>{console.error(e); setStatus('エラー','warn')});
+    }).catch(e=>showError('getDoc失敗', e));
   }
-  function disconnect(){ if(fb.unsub) fb.unsub(); fb.unsub=null; fb.connected=false; fb.docRef=null; setStatus('未接続'); }
+
+  function disconnect(){
+    if(fb.unsub) fb.unsub();
+    fb.unsub=null; fb.connected=false; fb.docRef=null; setStatus('未接続');
+  }
+
   connectBtn.addEventListener('click', connect);
   disconnectBtn.addEventListener('click', disconnect);
 
@@ -340,6 +336,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     return [...map.values()].map(normalize);
   }
 
+  /* ===== 画面描画 ===== */
   function card(it){
     const d=document.createElement('div'); d.className='card';
     const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!!it.owned;
@@ -350,7 +347,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
   }
 
   function render(){
-    const app=document.getElementById('app'); app.innerHTML='';
+    app.innerHTML='';
     const frag=document.createDocumentFragment();
     const regions=[...new Set(items.map(it=>it.region))].sort((a,b)=>(REGION_ORDER.indexOf(a)+1||999)-(REGION_ORDER.indexOf(b)+1||999)||a.localeCompare(b,'ja'));
     for(const r of regions){
@@ -378,8 +375,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
 
   // 初期描画
   render();
-
-})();   // IIFE
+})(); // IIFE
 </script>
 </body>
 </html>
