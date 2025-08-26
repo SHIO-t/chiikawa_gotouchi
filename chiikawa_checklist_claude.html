@@ -13,9 +13,7 @@
     input,select,button,textarea{margin:4px;padding:8px;border-radius:8px;border:1px solid #2b3a5d;background:#0b1327;color:var(--text)}
     button{cursor:pointer;background:linear-gradient(135deg,var(--accent2),var(--accent));border:none}
     .ghost{background:transparent;border:1px solid #2b3a5d}
-    .panel{background:#111827;margin:12px 0;padding:10px;border-radius:10px}
     .small{font-size:12px;color:#94a3b8}
-    .card{background:#0b1327;padding:8px;margin:6px 0;border-radius:6px;display:flex;align-items:center;gap:8px}
     details.region{margin:12px 0;border:1px solid #2b3a5d;border-radius:8px;overflow:hidden}
     details.region>summary{list-style:none;cursor:pointer;padding:10px 12px;background:#0b1327;font-weight:700;color:var(--accent)}
     details.region>summary::-webkit-details-marker{display:none}
@@ -23,8 +21,16 @@
     .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
     .ok{color:#10b981}
     .warn{color:#f59e0b}
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px}
     .hide{display:none}
+    /* ---- compact table view ---- */
+    .tableWrap{margin:8px 0}
+    .tbl{width:100%;border-collapse:collapse;border:1px solid #1f2937;background:#0b1327}
+    .tbl th,.tbl td{padding:8px 10px;border-bottom:1px solid #1f2937;text-align:left}
+    .tbl thead th{background:#0f172a;color:var(--muted);font-weight:600}
+    .tbl tr:hover{background:#0e1832}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:700;font-size:12px;border:1px solid #2b3a5d;margin-left:8px}
+    .badge.yes{border-color:#065f46;color:#10b981;background:rgba(16,185,129,.08)}
+    .small-muted{font-size:12px;color:#94a3b8;margin-left:8px}
   </style>
 </head>
 <body>
@@ -58,12 +64,25 @@
 
 <!-- Firebase SDK を ES Modules で読み込み（v10系） -->
 <script type="module">
+/* ===== 都道府県順の定義 ===== */
+const PREF_ORDER = [
+  "北海道","青森","岩手","宮城","秋田","山形","福島",
+  "茨城","栃木","群馬","埼玉","千葉","東京","神奈川",
+  "新潟","富山","石川","福井","山梨","長野","岐阜","静岡","愛知",
+  "三重","滋賀","京都","大阪","兵庫","奈良","和歌山",
+  "鳥取","島根","岡山","広島","山口",
+  "徳島","香川","愛媛","高知",
+  "福岡","佐賀","長崎","熊本","大分","宮崎","鹿児島","沖縄"
+];
+const prefRank = (p)=>{const ix=PREF_ORDER.indexOf(p);return ix>=0?ix:999;};
+
+/* ===== Firebase import ===== */
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js';
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js';
 import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js';
 
 (()=>{
-  /* ===== 固定Firebase設定（設定パネルは不要） ===== */
+  /* ===== 固定Firebase設定 ===== */
   const FIREBASE_CONFIG = {
     apiKey: "AIzaSyC66I66AmKfZFIyIKX_TXBSRTIsR2IDEDE",
     authDomain: "chiikawa-gotouchi-project.firebaseapp.com",
@@ -76,7 +95,13 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
   /* ===== アプリ内状態 ===== */
   const LS_KEY='chiikawa-keyholders-v11';
   const FAMILY_KEY=LS_KEY+'__family';
-  const REGION_ORDER=["北海道地方","東北地方","関東地方","中部地方","近畿地方","中国地方","四国地方","九州地方","海外","その他"];
+  // 「沖縄地方」は使わない（九州地方に統一）
+  const REGION_ORDER=[
+    "北海道地方","東北地方","関東地方","中部地方","近畿地方",
+    "中国地方","四国地方","九州地方","海外","その他"
+  ];
+
+  // ---- データ（沖縄は九州地方へ）----
   const FULL=[
     {region:"北海道地方",pref:"北海道",name:"北海道"},
     {region:"北海道地方",pref:"北海道",name:"ラベンダー"},
@@ -202,10 +227,10 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     {region:"九州地方",pref:"鹿児島",name:"黒豚"},
     {region:"九州地方",pref:"鹿児島",name:"桜島"},
     {region:"九州地方",pref:"鹿児島",name:"氷しろくま"},
-    {region:"沖縄地方",pref:"沖縄",name:"シーサー"},
-    {region:"沖縄地方",pref:"沖縄",name:"ジンベエザメ"},
-    {region:"沖縄地方",pref:"沖縄",name:"紅いもタルト"},
-    {region:"沖縄地方",pref:"奄美",name:"アマミノクロウサギ"},
+    {region:"九州地方",pref:"沖縄",name:"シーサー"},
+    {region:"九州地方",pref:"沖縄",name:"ジンベエザメ"},
+    {region:"九州地方",pref:"沖縄",name:"紅いもタルト"},
+    {region:"九州地方",pref:"奄美",name:"アマミノクロウサギ"},
     {region:"その他",pref:"温泉地",name:"温泉"},
     {region:"その他",pref:"リゾート",name:"スキー冬季限定"},
     {region:"その他",pref:"リゾート",name:"スノボー冬季限定"},
@@ -223,11 +248,24 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     {region:"海外",pref:"オーストラリア",name:"コアラ"},
     {region:"海外",pref:"オーストラリア",name:"カンガルー"}
   ];
+
+  // --- 旧データに「沖縄地方」が残っていても九州地方へマップする ---
+  function migrateRegion(v){ return v==="沖縄地方" ? "九州地方" : v; }
+
   function today(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
-  function normalize(x){return{region:String(x.region||''),pref:String(x.pref||''),name:String(x.name||''),owned:!!x.owned,ownedAt:x.ownedAt||null}}
+  function normalize(x){
+    return{
+      region:migrateRegion(String(x.region||'')),
+      pref:String(x.pref||''),
+      name:String(x.name||''),
+      owned:!!x.owned,
+      ownedAt:x.ownedAt||null
+    };
+  }
   function load(){try{const a=JSON.parse(localStorage.getItem(LS_KEY));if(Array.isArray(a))return a.map(normalize);return null}catch{return null}}
   let items=load()||FULL.map(x=>normalize(x));
-  function save(){localStorage.setItem(LS_KEY,JSON.stringify(items)); if(fb.connected && !fb.applying) pushToCloudDebounced();}
+
+  function setStatus(t,cls=''){ syncStatus.textContent=t; syncStatus.className='small '+(cls||''); }
 
   /* ===== UI要素 ===== */
   const app=document.getElementById('app');
@@ -246,25 +284,89 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
   fb.app = initializeApp(FIREBASE_CONFIG);
   fb.auth = getAuth(fb.app);
   fb.db = getFirestore(fb.app);
-
   const provider = new GoogleAuthProvider();
 
   loginBtn.addEventListener('click', async () => {
-    try{
-      await signInWithPopup(fb.auth, provider);
-    }catch(e){
-      console.error('login error', e);
-      setStatus('ログイン失敗', 'warn');
-      alert('ログインに失敗しました: ' + (e.code || e.message));
-    }
+    try{ await signInWithPopup(fb.auth, provider); }
+    catch(e){ console.error('login error', e); setStatus('ログイン失敗','warn'); alert('ログインに失敗しました: ' + (e.code || e.message)); }
   });
   logoutBtn.addEventListener('click', async () => {
-    try{
-      await signOut(fb.auth);
-    }catch(e){
-      console.error('logout error', e);
-    }
+    try{ await signOut(fb.auth); } catch(e){ console.error('logout error', e); }
   });
+
+  // ---- Firestore 同期 ----
+  function disconnect(){
+    if(fb.unsub) fb.unsub();
+    fb.unsub=null; fb.connected=false; fb.docRef=null; setStatus('未接続');
+  }
+  function showError(prefix, e){
+    console.error(prefix, e);
+    const msg=(e && (e.code||e.message))?` (${e.code||e.message})`:'';
+    setStatus(`エラー${msg}`,'warn');
+  }
+  function ensureLoggedIn(){
+    if(!fb.auth.currentUser){ alert('まず Google でログインしてください。'); return false; }
+    return true;
+  }
+  function mergeItems(remote, local){
+    // 正規化＋地域移行を両方に適用
+    const map=new Map();
+    for(const it of local.map(normalize)){
+      map.set(it.region+'__'+it.pref+'__'+it.name, it);
+    }
+    for(const it0 of remote){
+      const it=normalize(it0);
+      const k=it.region+'__'+it.pref+'__'+it.name;
+      if(!map.has(k)) map.set(k, it);
+      else{
+        const a=map.get(k);
+        map.set(k,{...a,...it,owned:!!(a.owned||it.owned),ownedAt:a.ownedAt||it.ownedAt||null});
+      }
+    }
+    return [...map.values()];
+  }
+  let pushTimer=null;
+  function pushToCloudDebounced(){
+    if(pushTimer) clearTimeout(pushTimer);
+    pushTimer=setTimeout(()=>{ if(fb.docRef) setDoc(fb.docRef,{items, updatedAt: Date.now()}); },300);
+  }
+  function save(){
+    localStorage.setItem(LS_KEY,JSON.stringify(items));
+    if(fb.connected && !fb.applying) pushToCloudDebounced();
+  }
+  function connect(){
+    if(!ensureLoggedIn()) return;
+    const code=(familyCodeInput.value||'').trim();
+    if(!code) return alert('家族コードを入力してください。');
+    setStatus('接続中…');
+    localStorage.setItem(FAMILY_KEY, code);
+
+    fb.docRef = doc(fb.db,'families', code,'lists','default');
+
+    getDoc(fb.docRef).then(async (snap)=>{
+      if(snap.exists()){
+        fb.applying=true;
+        const remote=(snap.data().items||[]).map(normalize);
+        items = mergeItems(remote, items);
+        save();
+        fb.applying=false;
+        render();
+      }else{
+        await setDoc(fb.docRef,{items, updatedAt: Date.now()});
+      }
+      if(fb.unsub) fb.unsub();
+      fb.unsub = onSnapshot(fb.docRef, s=>{
+        if(!s.exists()) return;
+        const remote=(s.data().items||[]).map(normalize);
+        fb.applying=true; items = mergeItems(remote, items); save(); fb.applying=false; render();
+      }, e=>showError('onSnapshot失敗', e));
+
+      fb.connected=true; setStatus('同期中','ok');
+    }).catch(e=>showError('getDoc失敗', e));
+  }
+
+  connectBtn.addEventListener('click', connect);
+  disconnectBtn.addEventListener('click', disconnect);
 
   onAuthStateChanged(fb.auth, (u) => {
     fb.uid = u ? u.uid : null;
@@ -273,7 +375,6 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
       logoutBtn.classList.remove('hide');
       userInfo.textContent = `ログイン中: ${u.email||u.uid}`;
       setStatus('ログイン済み');
-      // ローカルに保存してた家族コードを復元
       const saved = localStorage.getItem(FAMILY_KEY)||'';
       if(saved && !familyCodeInput.value) familyCodeInput.value = saved;
     }else{
@@ -281,25 +382,26 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
       logoutBtn.classList.add('hide');
       userInfo.textContent = '';
       setStatus('未接続');
-      // 切断
       disconnect();
     }
   });
 
-  /* ===== 表/CSVユーティリティ ===== */
-  const by = k => (a,b)=> (a[k]||'').localeCompare(b[k]||'', 'ja');
+  /* ===== CSV/印刷ユーティリティ ===== */
   function sortForOutput(arr){
     return [...arr].sort((a,b)=>{
       const ra=(REGION_ORDER.indexOf(a.region)+1)||999;
       const rb=(REGION_ORDER.indexOf(b.region)+1)||999;
-      return (ra-rb) || by('pref')(a,b) || by('name')(a,b);
+      if(ra!==rb) return ra-rb;
+      const pa=prefRank(a.pref), pb=prefRank(b.pref);
+      if(pa!==pb) return pa-pb;
+      return (a.name||'').localeCompare(b.name||'','ja');
     });
   }
   function csvCell(v){ const s=(v??'').toString().replace(/"/g,'""'); return /[,"\n]/.test(s)?'"'+s+'"':s; }
   function toCSV(data){
     const header=['地域','都道府県','名称','所持','所持日'];
     const rows=data.map(x=>[x.region,x.pref,x.name,x.owned?1:0,x.ownedAt||''].map(csvCell).join(','));
-    return ['\ufeff'+header.join(','),...rows].join('\n'); // BOM付き（Excel対策）
+    return ['\ufeff'+header.join(','),...rows].join('\n');
   }
   function downloadBlob(filename, text, mime='text/csv;charset=utf-8;'){
     const blob=new Blob([text],{type:mime});
@@ -312,6 +414,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     const csv=toCSV(sorted);
     downloadBlob(filename, csv);
   }
+  btnCSVAll.addEventListener('click', ()=>exportCSV(items,'chiikawa_all.csv'));
 
   function openPrintAll() {
     const data = sortForOutput(items);
@@ -319,7 +422,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     if (!win) { alert('ポップアップがブロックされています。許可してください。'); return; }
     const css = `
       :root{--text:#111;--border:#e5e7eb}
-      body{font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Noto Sans JP,Meiryo,sans-serif;color:var(--text);margin:0;background:#fff}
+      body{font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Noto Sans JP,Meiryo,sans-serif;color:#111;margin:0;background:#fff}
       .wrap-n{max-width:1100px;margin:24px auto;padding:0 16px}
       h2{margin:0 0 12px;color:#0b1225}
       table.pretty{width:100%;border-collapse:collapse;border:1px solid var(--border)}
@@ -338,151 +441,122 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
       const wrap = doc.createElement('div'); wrap.className = 'wrap-n'; doc.body.appendChild(wrap);
       const h2 = doc.createElement('h2'); h2.textContent = 'ちいかわ ご当地キーホルダー 一覧'; wrap.appendChild(h2);
       const table = doc.createElement('table'); table.className='pretty';
-      const thead = doc.createElement('thead'); const trh = doc.createElement('tr');
-      ['地域','都道府県','名称','所持','所持日'].forEach(t=>{const th=doc.createElement('th'); th.textContent=t; trh.appendChild(th);});
+      const thead = doc.createElement('thead'); const trh = document.createElement('tr');
+      ['地域','都道府県','名称','所持','所持日'].forEach(t=>{const th=document.createElement('th'); th.textContent=t; trh.appendChild(th);});
       thead.appendChild(trh); table.appendChild(thead);
-      const tbody = doc.createElement('tbody');
+      const tbody = document.createElement('tbody');
       if(data.length===0){
-        const tr=doc.createElement('tr'); const td=doc.createElement('td'); td.colSpan=5; td.textContent='データがありません'; tr.appendChild(td); tbody.appendChild(tr);
+        const tr=document.createElement('tr'); const td=document.createElement('td'); td.colSpan=5; td.textContent='データがありません'; tr.appendChild(td); tbody.appendChild(tr);
       }else{
         data.forEach(x=>{
-          const tr=doc.createElement('tr');
-          const td1=doc.createElement('td'); td1.textContent=x.region;
-          const td2=doc.createElement('td'); td2.textContent=x.pref;
-          const td3=doc.createElement('td'); td3.textContent=x.name;
-          const td4=doc.createElement('td'); td4.style.textAlign='center'; const badge=doc.createElement('span'); badge.className='b '+(x.owned?'yes':'no'); badge.textContent=x.owned?'所持':'未所持'; td4.appendChild(badge);
-          const td5=doc.createElement('td'); td5.textContent=x.ownedAt||'';
+          const tr=document.createElement('tr');
+          const td1=document.createElement('td'); td1.textContent=x.region;
+          const td2=document.createElement('td'); td2.textContent=x.pref;
+          const td3=document.createElement('td'); td3.textContent=x.name;
+          const td4=document.createElement('td'); td4.style.textAlign='center'; const badge=document.createElement('span'); badge.className='b '+(x.owned?'yes':'no'); badge.textContent=x.owned?'所持':'未所持'; td4.appendChild(badge);
+          const td5=document.createElement('td'); td5.textContent=x.ownedAt||'';
           tr.append(td1,td2,td3,td4,td5); tbody.appendChild(tr);
         });
       }
       table.appendChild(tbody); wrap.appendChild(table);
-      const btnBox = doc.createElement('div'); btnBox.style.textAlign='right'; btnBox.style.marginTop='10px';
-      const printBtn = doc.createElement('button'); printBtn.id='printBtn'; printBtn.textContent='🖨️ 印刷'; printBtn.addEventListener('click', ()=>win.print());
+      const btnBox = document.createElement('div'); btnBox.style.textAlign='right'; btnBox.style.marginTop='10px';
+      const printBtn = document.createElement('button'); printBtn.id='printBtn'; printBtn.textContent='🖨️ 印刷'; printBtn.addEventListener('click', ()=>win.print());
       btnBox.appendChild(printBtn); wrap.appendChild(btnBox);
     };
     if (win.document.readyState === 'complete') build(); else win.addEventListener('load', build);
   }
-
   btnPrint.addEventListener('click', openPrintAll);
-  btnCSVAll.addEventListener('click', ()=>exportCSV(items,'chiikawa_all.csv'));
 
-  /* ===== ステータス表示 ===== */
-  function setStatus(t,cls=''){ syncStatus.textContent=t; syncStatus.className='small '+cls; }
-
-  /* ===== Firestore 同期（家族コード付き） ===== */
-  const savedFamily = localStorage.getItem(FAMILY_KEY)||'';
-  if(savedFamily) familyCodeInput.value = savedFamily;
-
-  function ensureLoggedIn(){
-    if(!fb.auth.currentUser){
-      alert('まず Google でログインしてください。');
-      return false;
-    }
-    return true;
-  }
-
-  function showError(prefix, e){
-    console.error(prefix, e);
-    const msg = (e && (e.code || e.message)) ? ` (${e.code || e.message})` : '';
-    setStatus(`エラー${msg}`, 'warn');
-  }
-
-  function connect(){
-    if(!ensureLoggedIn()) return;
-    const code=(familyCodeInput.value||'').trim();
-    if(!code) return alert('家族コードを入力してください。');
-    setStatus('接続中…');
-    localStorage.setItem(FAMILY_KEY, code);
-
-    fb.docRef = doc(fb.db,'families', code,'lists','default');
-
-    // 初回読み込み
-    getDoc(fb.docRef).then(async (snap)=>{
-      if(snap.exists()){
-        fb.applying=true;
-        const remote=(snap.data().items||[]).map(normalize);
-        items = mergeItems(remote, items);
-        save();
-        fb.applying=false;
-        render();
-      }else{
-        await setDoc(fb.docRef,{items, updatedAt: Date.now()});
-      }
-      // リアルタイム購読
-      if(fb.unsub) fb.unsub();
-      fb.unsub = onSnapshot(fb.docRef, s=>{
-        if(!s.exists()) return;
-        const remote=(s.data().items||[]).map(normalize);
-        fb.applying=true; items = mergeItems(remote, items); save(); fb.applying=false; render();
-      }, e=>showError('onSnapshot失敗', e));
-
-      fb.connected=true; setStatus('同期中','ok');
-    }).catch(e=>showError('getDoc失敗', e));
-  }
-
-  function disconnect(){
-    if(fb.unsub) fb.unsub();
-    fb.unsub=null; fb.connected=false; fb.docRef=null; setStatus('未接続');
-  }
-
-  connectBtn.addEventListener('click', connect);
-  disconnectBtn.addEventListener('click', disconnect);
-
-  let pushTimer=null;
-  function pushToCloudDebounced(){ if(pushTimer) clearTimeout(pushTimer); pushTimer=setTimeout(()=>{ if(fb.docRef) setDoc(fb.docRef,{items, updatedAt: Date.now()}); },300); }
-
-  function mergeItems(remote, local){
-    const map=new Map();
-    for(const it of local){ map.set(it.region+'__'+it.pref+'__'+it.name, it); }
-    for(const it of remote){
-      const k=it.region+'__'+it.pref+'__'+it.name;
-      if(!map.has(k)) map.set(k, it);
-      else{
-        const a=map.get(k);
-        map.set(k,{...a,...it,owned:!!(a.owned||it.owned),ownedAt:a.ownedAt||it.ownedAt||null});
-      }
-    }
-    return [...map.values()].map(normalize);
-  }
-
-  /* ===== 画面描画 ===== */
-  function card(it){
-    const d=document.createElement('div'); d.className='card';
-    const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!!it.owned;
-    cb.addEventListener('change',()=>{it.owned=cb.checked;if(cb.checked&&!it.ownedAt)it.ownedAt=today();if(!cb.checked)it.ownedAt=null;save();render()});
-    const name=document.createElement('span'); name.textContent=it.name;
-    const dd=document.createElement('span'); dd.className='small'; dd.textContent=it.ownedAt?`(${it.ownedAt})`:'';
-    d.appendChild(cb); d.appendChild(name); d.appendChild(dd); return d;
-  }
-
+  /* ===== 画面描画（2カラム） ===== */
   function render(){
     app.innerHTML='';
     const frag=document.createDocumentFragment();
-    const regions=[...new Set(items.map(it=>it.region))].sort((a,b)=>(REGION_ORDER.indexOf(a)+1||999)-(REGION_ORDER.indexOf(b)+1||999)||a.localeCompare(b,'ja'));
+    const regions=[...new Set(items.map(it=>it.region))]
+      .map(migrateRegion)
+      .sort((a,b)=>(REGION_ORDER.indexOf(a)+1||999)-(REGION_ORDER.indexOf(b)+1||999)||a.localeCompare(b,'ja'));
+
     for(const r of regions){
-      const rItems=items.filter(it=>it.region===r);
+      const rItems=items.filter(it=>migrateRegion(it.region)===r);
       const ownR=rItems.filter(x=>x.owned).length;
-      const details=document.createElement('details'); details.className='region'; details.open=(localStorage.getItem(LS_KEY+'_open_'+r)==='1');
-      const summary=document.createElement('summary'); summary.textContent=`${r} ${ownR}/${rItems.length}`; details.appendChild(summary);
-      const inner=document.createElement('div'); inner.className='inner';
-      const byPref={}; for(const it of rItems){(byPref[it.pref]||(byPref[it.pref]=[])).push(it)}
-      const prefNames=Object.keys(byPref).sort((a,b)=>a.localeCompare(b,'ja'));
-      for(const p of prefNames){
-        const sec=document.createElement('section'); sec.className='panel';
-        const h2=document.createElement('h2'); const cnt=byPref[p].length; const own=byPref[p].filter(x=>x.owned).length; h2.textContent=`${p} ${own}/${cnt}`; sec.appendChild(h2);
-        byPref[p].sort((a,b)=>(a.name||'').localeCompare(b.name||'','ja')).forEach(it=>sec.appendChild(card(it)));
-        inner.appendChild(sec);
+
+      const details=document.createElement('details');
+      details.className='region';
+      details.open=(localStorage.getItem(LS_KEY+'_open_'+r)==='1');
+
+      const summary=document.createElement('summary');
+      summary.textContent=`${r} ${ownR}/${rItems.length}`;
+      details.appendChild(summary);
+
+      const inner=document.createElement('div');
+      inner.className='inner';
+
+      // 都道府県でグルーピング → 47都道府県順
+      const byPref={};
+      for(const it0 of rItems){
+        const it=normalize(it0);
+        (byPref[it.pref]||(byPref[it.pref]=[])).push(it);
       }
+      const prefNames=Object.keys(byPref).sort((a,b)=>{
+        const ra=prefRank(a), rb=prefRank(b);
+        return (ra-rb) || a.localeCompare(b,'ja');
+      });
+
+      // 2カラムテーブル
+      const wrap=document.createElement('div'); wrap.className='tableWrap';
+      const table=document.createElement('table'); table.className='tbl';
+      const thead=document.createElement('thead'); const trh=document.createElement('tr');
+      ["都道府県","名称"].forEach(t=>{const th=document.createElement('th'); th.textContent=t; trh.appendChild(th);});
+      thead.appendChild(trh); table.appendChild(thead);
+
+      const tbody=document.createElement('tbody');
+      for(const p of prefNames){
+        const rows=byPref[p].sort((a,b)=>(a.name||'').localeCompare(b.name||'','ja'));
+        rows.forEach((it,idx)=>{
+          const tr=document.createElement('tr');
+
+          const tdPref=document.createElement('td');
+          if(idx===0){ tdPref.textContent=p; tdPref.style.whiteSpace='nowrap'; } else { tdPref.textContent=''; }
+          tr.appendChild(tdPref);
+
+          const tdName=document.createElement('td');
+          const rowBox=document.createElement('div'); rowBox.className='row';
+
+          const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!!it.owned;
+          cb.addEventListener('change',()=>{
+            it.owned=cb.checked;
+            if(cb.checked && !it.ownedAt) it.ownedAt=today();
+            if(!cb.checked) it.ownedAt=null;
+            save(); render();
+          });
+
+          const nameSpan=document.createElement('span'); nameSpan.textContent=it.name;
+          const ownedBadge=document.createElement('span'); ownedBadge.className='badge'+(it.owned?' yes':''); ownedBadge.textContent=it.owned?'所持':'未所持';
+          const dateSmall=document.createElement('span'); dateSmall.className='small-muted'; dateSmall.textContent = it.ownedAt ? `(${it.ownedAt})` : '';
+
+          rowBox.append(cb, nameSpan, ownedBadge, dateSmall);
+          tdName.appendChild(rowBox);
+          tr.appendChild(tdName);
+
+          tbody.appendChild(tr);
+        });
+      }
+
+      table.appendChild(tbody); wrap.appendChild(table); inner.appendChild(wrap);
       details.appendChild(inner);
       details.addEventListener('toggle',()=>localStorage.setItem(LS_KEY+'_open_'+r,details.open?'1':'0'));
       frag.appendChild(details);
     }
+
     app.appendChild(frag);
+
     const ownTotal=items.filter(x=>x.owned).length;
-    document.getElementById('stats').textContent = `${ownTotal}/${items.length} 所持 (${items.length?Math.round(ownTotal/items.length*100):0}%)`;
+    document.getElementById('stats').textContent =
+      `${ownTotal}/${items.length} 所持 (${items.length?Math.round(ownTotal/items.length*100):0}%)`;
   }
 
-  // 初期描画
+  // 初期描画（家族コード復元）
+  const savedFamily = localStorage.getItem(FAMILY_KEY)||'';
+  if(savedFamily) familyCodeInput.value = savedFamily;
   render();
 })(); // IIFE
 </script>
