@@ -28,6 +28,7 @@
     .tbl th,.tbl td{padding:8px 10px;border-bottom:1px solid #1f2937;text-align:left}
     .tbl thead th{background:#0f172a;color:var(--muted);font-weight:600}
     .tbl tr:hover{background:#0e1832}
+    .tbl td:first-child,.tbl th:first-child{white-space:nowrap;width:1%}
     .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:700;font-size:12px;border:1px solid #2b3a5d;margin-left:8px}
     .badge.yes{border-color:#065f46;color:#10b981;background:rgba(16,185,129,.08)}
     .small-muted{font-size:12px;color:#94a3b8;margin-left:8px}
@@ -331,8 +332,13 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     pushTimer=setTimeout(()=>{ if(fb.docRef) setDoc(fb.docRef,{items, updatedAt: Date.now()}); },300);
   }
   function save(){
-    localStorage.setItem(LS_KEY,JSON.stringify(items));
-    if(fb.connected && !fb.applying) pushToCloudDebounced();
+    try{
+      localStorage.setItem(LS_KEY,JSON.stringify(items));
+      if(fb.connected && !fb.applying) pushToCloudDebounced();
+    }catch(e){
+      console.error('localStorage save failed', e);
+      setStatus('保存に失敗（ローカルストレージ）','warn');
+    }
   }
   function connect(){
     if(!ensureLoggedIn()) return;
@@ -416,64 +422,102 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
   }
   btnCSVAll.addEventListener('click', ()=>exportCSV(items,'chiikawa_all.csv'));
 
+  /* ===== 一覧を同一ページにオーバーレイ表示（ポップアップ不要） ===== */
   function openPrintAll() {
-    const data = sortForOutput(items);
-    const win = window.open('about:blank', '_blank', 'noopener');
-    if (!win) { alert('ポップアップがブロックされています。許可してください。'); return; }
-    const css = `
-      :root{--text:#111;--border:#e5e7eb}
-      body{font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Noto Sans JP,Meiryo,sans-serif;color:#111;margin:0;background:#fff}
-      .wrap-n{max-width:1100px;margin:24px auto;padding:0 16px}
-      h2{margin:0 0 12px;color:#0b1225}
-      table.pretty{width:100%;border-collapse:collapse;border:1px solid var(--border)}
-      table.pretty th,table.pretty td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;font-size:14px}
-      thead th{background:#f8fafc}
-      .b{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:700;font-size:12px;border:1px solid #ddd}
-      .b.yes{background:#ecfdf5;color:#065f46;border-color:#bbf7d0}
-      .b.no{background:#fff1f2;color:#9f1239;border-color:#fecdd3}
-      button{padding:8px 12px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer}
-      @media print{#printBtn{display:none}}
-    `;
-    const build = () => {
-      const doc = win.document;
-      doc.title = 'ちいかわ 一覧';
-      const style = doc.createElement('style'); style.textContent = css; doc.head.appendChild(style);
-      const wrap = doc.createElement('div'); wrap.className = 'wrap-n'; doc.body.appendChild(wrap);
-      const h2 = doc.createElement('h2'); h2.textContent = 'ちいかわ ご当地キーホルダー 一覧'; wrap.appendChild(h2);
-      const table = doc.createElement('table'); table.className='pretty';
-      const thead = doc.createElement('thead'); const trh = document.createElement('tr');
-      ['地域','都道府県','名称','所持','所持日'].forEach(t=>{const th=document.createElement('th'); th.textContent=t; trh.appendChild(th);});
-      thead.appendChild(trh); table.appendChild(thead);
-      const tbody = document.createElement('tbody');
-      if(data.length===0){
-        const tr=document.createElement('tr'); const td=document.createElement('td'); td.colSpan=5; td.textContent='データがありません'; tr.appendChild(td); tbody.appendChild(tr);
-      }else{
-        data.forEach(x=>{
-          const tr=document.createElement('tr');
-          const td1=document.createElement('td'); td1.textContent=x.region;
-          const td2=document.createElement('td'); td2.textContent=x.pref;
-          const td3=document.createElement('td'); td3.textContent=x.name;
-          const td4=document.createElement('td'); td4.style.textAlign='center'; const badge=document.createElement('span'); badge.className='b '+(x.owned?'yes':'no'); badge.textContent=x.owned?'所持':'未所持'; td4.appendChild(badge);
-          const td5=document.createElement('td'); td5.textContent=x.ownedAt||'';
-          tr.append(td1,td2,td3,td4,td5); tbody.appendChild(tr);
-        });
+    const ensureOverlay = () => {
+      let el = document.getElementById('printOverlay');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'printOverlay';
+        el.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#fff;color:#111;overflow:auto;display:none;';
+        document.body.appendChild(el);
       }
-      table.appendChild(tbody); wrap.appendChild(table);
-      const btnBox = document.createElement('div'); btnBox.style.textAlign='right'; btnBox.style.marginTop='10px';
-      const printBtn = document.createElement('button'); printBtn.id='printBtn'; printBtn.textContent='🖨️ 印刷'; printBtn.addEventListener('click', ()=>win.print());
-      btnBox.appendChild(printBtn); wrap.appendChild(btnBox);
+      return el;
     };
-    if (win.document.readyState === 'complete') build(); else win.addEventListener('load', build);
+
+    const data = sortForOutput(items || []);
+    const esc = (s) => String(s ?? '')
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+
+    const rows = data.length
+      ? data.map(x => `
+        <tr>
+          <td>${esc(x.region)}</td>
+          <td>${esc(x.pref)}</td>
+          <td>${esc(x.name)}</td>
+          <td style="text-align:center">
+            <span class="b ${x.owned ? 'yes' : 'no'}">${x.owned ? '所持' : '未所持'}</span>
+          </td>
+          <td>${esc(x.ownedAt || '')}</td>
+        </tr>`).join('')
+      : `<tr><td colspan="5">データがありません</td></tr>`;
+
+    const overlay = ensureOverlay();
+    overlay.innerHTML = `
+      <div style="max-width:1100px;margin:24px auto;padding:0 16px">
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:10px" id="printControls">
+          <button id="pClose" style="padding:8px 12px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer">閉じる</button>
+          <button id="pPrint" style="padding:8px 12px;border-radius:8px;border:1px solid #ccc;background:#fff;cursor:pointer">🖨️ 印刷</button>
+        </div>
+        <h2 style="margin:0 0 12px;color:#0b1225">ちいかわ ご当地キーホルダー 一覧</h2>
+        <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb" class="pretty">
+          <thead>
+            <tr style="background:#f8fafc">
+              <th style="text-align:left;padding:8px 10px;border-bottom:1px solid #e5e7eb">地域</th>
+              <th style="text-align:left;padding:8px 10px;border-bottom:1px solid #e5e7eb">都道府県</th>
+              <th style="text-align:left;padding:8px 10px;border-bottom:1px solid #e5e7eb">名称</th>
+              <th style="text-align:left;padding:8px 10px;border-bottom:1px solid #e5e7eb">所持</th>
+              <th style="text-align:left;padding:8px 10px;border-bottom:1px solid #e5e7eb">所持日</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div style="height:24px"></div>
+      </div>
+      <style>
+        .pretty td { padding:8px 10px; border-bottom:1px solid #e5e7eb; font-size:14px; }
+        .b { display:inline-block; padding:2px 8px; border-radius:999px; font-weight:700; font-size:12px; border:1px solid #ddd; }
+        .b.yes{ background:#ecfdf5; color:#065f46; border-color:#bbf7d0 }
+        .b.no { background:#fff1f2; color:#9f1239; border-color:#fecdd3 }
+        @media print {
+          #printControls { display:none !important; }
+          #printOverlay { position:static !important; overflow:visible !important; }
+        }
+      </style>
+    `;
+    overlay.style.display = 'block';
+
+    overlay.querySelector('#pClose').onclick = () => {
+      overlay.style.display = 'none';
+      overlay.innerHTML = '';
+    };
+    overlay.querySelector('#pPrint').onclick = () => window.print();
   }
-  btnPrint.addEventListener('click', openPrintAll);
+
+  document.getElementById('btnPrint').addEventListener('click', openPrintAll);
 
   /* ===== 画面描画（2カラム） ===== */
+  const regionSummaryEl = new Map(); // 地域→summaryエレメント参照
+
+  function updateStats(){
+    const ownTotal=items.filter(x=>x.owned).length;
+    document.getElementById('stats').textContent =
+      `${ownTotal}/${items.length} 所持 (${items.length?Math.round(ownTotal/items.length*100):0}%)`;
+  }
+
   function render(){
     app.innerHTML='';
-    const frag=document.createDocumentFragment();
-    const regions=[...new Set(items.map(it=>it.region))]
-      .map(migrateRegion)
+    regionSummaryEl.clear();
+
+    // migrateRegion を先に当ててから Set で重複排除
+    const regions=[...new Set(items.map(it=>migrateRegion(it.region)))]
       .sort((a,b)=>(REGION_ORDER.indexOf(a)+1||999)-(REGION_ORDER.indexOf(b)+1||999)||a.localeCompare(b,'ja'));
+
+    const frag=document.createDocumentFragment();
 
     for(const r of regions){
       const rItems=items.filter(it=>migrateRegion(it.region)===r);
@@ -486,14 +530,14 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
       const summary=document.createElement('summary');
       summary.textContent=`${r} ${ownR}/${rItems.length}`;
       details.appendChild(summary);
+      regionSummaryEl.set(r, summary); // 後で即時更新に使う
 
       const inner=document.createElement('div');
       inner.className='inner';
 
-      // 都道府県でグルーピング → 47都道府県順
+      // 都道府県でグルーピング（items の実体参照）
       const byPref={};
-      for(const it0 of rItems){
-        const it=normalize(it0);
+      for(const it of rItems){
         (byPref[it.pref]||(byPref[it.pref]=[])).push(it);
       }
       const prefNames=Object.keys(byPref).sort((a,b)=>{
@@ -522,11 +566,37 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
           const rowBox=document.createElement('div'); rowBox.className='row';
 
           const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!!it.owned;
-          cb.addEventListener('change',()=>{
-            it.owned=cb.checked;
-            if(cb.checked && !it.ownedAt) it.ownedAt=today();
-            if(!cb.checked) it.ownedAt=null;
-            save(); render();
+          // details の開閉誤反応を防止
+          cb.addEventListener('click', (e)=> e.stopPropagation());
+          cb.addEventListener('change', (ev) => {
+            const checked = ev.currentTarget.checked;
+
+            // モデル更新（items の実体）
+            it.owned = checked;
+            it.ownedAt = checked ? (it.ownedAt || today()) : null;
+
+            // UI即時更新（この行）
+            const ownedBadge = rowBox.querySelector('span.badge');
+            const dateSmall = rowBox.querySelector('span.small-muted');
+            ownedBadge.classList.toggle('yes', checked);
+            ownedBadge.textContent = checked ? '所持' : '未所持';
+            dateSmall.textContent = it.ownedAt ? `(${it.ownedAt})` : '';
+
+            // 地域サマリも更新
+            const rNow = migrateRegion(it.region);
+            const rAll = items.filter(x=>migrateRegion(x.region)===rNow);
+            const rOwn = rAll.filter(x=>x.owned).length;
+            const sumEl = regionSummaryEl.get(rNow);
+            if(sumEl) sumEl.textContent = `${rNow} ${rOwn}/${rAll.length}`;
+
+            // 全体進捗も更新
+            updateStats();
+
+            // 保存（失敗してもUIは維持）
+            try { save(); } catch(e){ console.error('save() failed', e); setStatus('保存に失敗（コンソール参照）','warn'); }
+
+            // details/summary 誤反応防止
+            ev.stopPropagation();
           });
 
           const nameSpan=document.createElement('span'); nameSpan.textContent=it.name;
@@ -548,10 +618,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     }
 
     app.appendChild(frag);
-
-    const ownTotal=items.filter(x=>x.owned).length;
-    document.getElementById('stats').textContent =
-      `${ownTotal}/${items.length} 所持 (${items.length?Math.round(ownTotal/items.length*100):0}%)`;
+    updateStats();
   }
 
   // 初期描画（家族コード復元）
