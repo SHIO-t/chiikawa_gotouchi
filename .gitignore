@@ -20,6 +20,9 @@ package-lock.json
 # Logs
 *.log
 
+# 自動更新の差分レポート（実行のたびに生成される中間成果物）
+scripts/catalog-report.md
+
 # Env (もしAPIキーや秘密情報を置く場合)
 .env
 .env.local

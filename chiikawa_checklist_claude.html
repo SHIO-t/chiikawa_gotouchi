@@ -97,134 +97,141 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
   const LS_KEY='chiikawa-keyholders-v11';
   const FAMILY_KEY=LS_KEY+'__family';
   // 「沖縄地方」は使わない（九州地方に統一）
+  // 「未分類」は自動更新で新エリアが出たときの受け皿（scripts/area-map.json 未定義のエリア）
   const REGION_ORDER=[
     "北海道地方","東北地方","関東地方","中部地方","近畿地方",
-    "中国地方","四国地方","九州地方","海外","その他"
+    "中国地方","四国地方","九州地方","海外","その他","未分類"
   ];
 
   // ---- データ（沖縄は九州地方へ）----
+  // <<<AUTO-CATALOG-START>>> scripts/update-catalog.mjs が自動生成します。手で編集しないでください。
   const FULL=[
-    {region:"北海道地方",pref:"北海道",name:"北海道"},
-    {region:"北海道地方",pref:"北海道",name:"ラベンダー"},
-    {region:"北海道地方",pref:"北海道",name:"メロン"},
-    {region:"北海道地方",pref:"北海道",name:"シマエナガ"},
     {region:"北海道地方",pref:"北海道",name:"くま"},
+    {region:"北海道地方",pref:"北海道",name:"シマエナガ"},
+    {region:"北海道地方",pref:"北海道",name:"メロン"},
+    {region:"北海道地方",pref:"北海道",name:"ラベンダー"},
     {region:"北海道地方",pref:"北海道",name:"札幌テレビ塔"},
+    {region:"北海道地方",pref:"北海道",name:"小樽運河"},
     {region:"北海道地方",pref:"北海道",name:"函館の夜景"},
+    {region:"北海道地方",pref:"北海道",name:"北海道"},
     {region:"東北地方",pref:"青森",name:"ねぶた祭"},
     {region:"東北地方",pref:"青森",name:"りんご"},
     {region:"東北地方",pref:"岩手",name:"わんこそば"},
     {region:"東北地方",pref:"岩手",name:"銀河鉄道"},
-    {region:"東北地方",pref:"宮城",name:"笹かま"},
-    {region:"東北地方",pref:"宮城",name:"伊達政宗"},
     {region:"東北地方",pref:"宮城",name:"こけし"},
-    {region:"東北地方",pref:"秋田",name:"秋田犬"},
+    {region:"東北地方",pref:"宮城",name:"伊達政宗"},
+    {region:"東北地方",pref:"宮城",name:"笹かま"},
     {region:"東北地方",pref:"秋田",name:"なまはげ"},
+    {region:"東北地方",pref:"秋田",name:"竿燈まつり"},
+    {region:"東北地方",pref:"秋田",name:"秋田犬"},
     {region:"東北地方",pref:"山形",name:"さくらんぼ"},
-    {region:"東北地方",pref:"山形",name:"米沢牛"},
-    {region:"東北地方",pref:"山形",name:"花笠"},
     {region:"東北地方",pref:"山形",name:"だだちゃ豆"},
-    {region:"東北地方",pref:"福島",name:"赤べこ"},
+    {region:"東北地方",pref:"山形",name:"花笠"},
+    {region:"東北地方",pref:"山形",name:"米沢牛"},
     {region:"東北地方",pref:"福島",name:"ハワイアン"},
-    {region:"東北地方",pref:"福島",name:"白虎隊"},
+    {region:"東北地方",pref:"福島",name:"赤べこ"},
     {region:"東北地方",pref:"福島",name:"桃"},
+    {region:"東北地方",pref:"福島",name:"白虎隊"},
     {region:"関東地方",pref:"茨城",name:"黄門様"},
     {region:"関東地方",pref:"茨城",name:"水戸納豆"},
     {region:"関東地方",pref:"栃木",name:"スカイベリー"},
-    {region:"関東地方",pref:"栃木",name:"藤の花"},
-    {region:"関東地方",pref:"栃木",name:"三猿"},
     {region:"関東地方",pref:"栃木",name:"関東・栃木レモン"},
-    {region:"関東地方",pref:"群馬",name:"草津温泉"},
+    {region:"関東地方",pref:"栃木",name:"三猿"},
+    {region:"関東地方",pref:"栃木",name:"藤の花"},
     {region:"関東地方",pref:"群馬",name:"だるま"},
     {region:"関東地方",pref:"群馬",name:"焼きまんじゅう"},
+    {region:"関東地方",pref:"群馬",name:"草津温泉"},
     {region:"関東地方",pref:"埼玉",name:"さつまいも"},
     {region:"関東地方",pref:"埼玉",name:"深谷ネギ"},
+    {region:"関東地方",pref:"千葉",name:"行徳みこし"},
     {region:"関東地方",pref:"千葉",name:"落花生"},
-    {region:"関東地方",pref:"東京",name:"雷門"},
-    {region:"関東地方",pref:"東京",name:"東京パンダ"},
-    {region:"関東地方",pref:"東京",name:"東京タワー"},
+    {region:"関東地方",pref:"千葉",name:"梨"},
     {region:"関東地方",pref:"東京",name:"スカイツリー"},
+    {region:"関東地方",pref:"東京",name:"東京タワー"},
+    {region:"関東地方",pref:"東京",name:"東京パンダ"},
     {region:"関東地方",pref:"東京",name:"東京駅丸の内駅舎"},
-    {region:"関東地方",pref:"神奈川",name:"箱根温泉まんじゅう"},
+    {region:"関東地方",pref:"東京",name:"雷門"},
+    {region:"関東地方",pref:"神奈川",name:"横浜カンフー"},
     {region:"関東地方",pref:"神奈川",name:"横浜金の豚"},
     {region:"関東地方",pref:"神奈川",name:"鎌倉大仏さま"},
     {region:"関東地方",pref:"神奈川",name:"寄木細工"},
-    {region:"関東地方",pref:"神奈川",name:"横浜カンフー"},
     {region:"関東地方",pref:"神奈川",name:"大涌谷黒たまご"},
-    {region:"中部地方",pref:"新潟",name:"笹団子"},
+    {region:"関東地方",pref:"神奈川",name:"箱根温泉まんじゅう"},
     {region:"中部地方",pref:"新潟",name:"トキ"},
+    {region:"中部地方",pref:"新潟",name:"笹団子"},
     {region:"中部地方",pref:"富山",name:"ホタルイカ"},
     {region:"中部地方",pref:"石川",name:"兼六園"},
     {region:"中部地方",pref:"福井",name:"恐竜"},
     {region:"中部地方",pref:"山梨",name:"ぶどう"},
-    {region:"中部地方",pref:"長野",name:"信州りんご"},
     {region:"中部地方",pref:"長野",name:"信州オコジョ"},
-    {region:"中部地方",pref:"岐阜",name:"合掌造り"},
+    {region:"中部地方",pref:"長野",name:"信州りんご"},
     {region:"中部地方",pref:"岐阜",name:"さるぼぼ"},
+    {region:"中部地方",pref:"岐阜",name:"合掌造り"},
+    {region:"中部地方",pref:"静岡",name:"いちご"},
+    {region:"中部地方",pref:"静岡",name:"うなぎ"},
     {region:"中部地方",pref:"静岡",name:"お茶"},
     {region:"中部地方",pref:"静岡",name:"みかん"},
-    {region:"中部地方",pref:"静岡",name:"うなぎ"},
-    {region:"中部地方",pref:"静岡",name:"いちご"},
-    {region:"中部地方",pref:"静岡",name:"次郎長"},
     {region:"中部地方",pref:"静岡",name:"桜えび"},
-    {region:"中部地方",pref:"富士山",name:"富士山"},
+    {region:"中部地方",pref:"静岡",name:"次郎長"},
     {region:"中部地方",pref:"愛知",name:"しゃちほこ"},
     {region:"中部地方",pref:"愛知",name:"小倉トースト"},
-    {region:"近畿地方",pref:"三重",name:"真珠"},
+    {region:"中部地方",pref:"富士山",name:"富士山"},
     {region:"近畿地方",pref:"三重",name:"伊勢エビ"},
+    {region:"近畿地方",pref:"三重",name:"真珠"},
+    {region:"近畿地方",pref:"滋賀",name:"信楽たぬき"},
+    {region:"近畿地方",pref:"滋賀",name:"忍者"},
     {region:"近畿地方",pref:"滋賀",name:"琵琶湖"},
     {region:"近畿地方",pref:"滋賀",name:"彦根城"},
-    {region:"近畿地方",pref:"滋賀",name:"忍者"},
-    {region:"近畿地方",pref:"滋賀",name:"信楽たぬき"},
-    {region:"近畿地方",pref:"京都",name:"八ッ橋"},
+    {region:"近畿地方",pref:"京都",name:"ニデック京都タワー"},
+    {region:"近畿地方",pref:"京都",name:"金閣寺"},
     {region:"近畿地方",pref:"京都",name:"新選組"},
+    {region:"近畿地方",pref:"京都",name:"八ッ橋"},
     {region:"近畿地方",pref:"京都",name:"伏見稲荷"},
     {region:"近畿地方",pref:"京都",name:"抹茶ソフト"},
-    {region:"近畿地方",pref:"京都",name:"金閣寺"},
-    {region:"近畿地方",pref:"京都",name:"ニデック京都タワー"},
     {region:"近畿地方",pref:"大阪",name:"たこ焼"},
-    {region:"近畿地方",pref:"大阪",name:"通天閣"},
+    {region:"近畿地方",pref:"大阪",name:"ミックスジュース"},
     {region:"近畿地方",pref:"大阪",name:"大阪のおばちゃん"},
     {region:"近畿地方",pref:"大阪",name:"大阪城"},
-    {region:"近畿地方",pref:"大阪",name:"ミックスジュース"},
+    {region:"近畿地方",pref:"大阪",name:"通天閣"},
+    {region:"近畿地方",pref:"兵庫",name:"コウノトリ"},
     {region:"近畿地方",pref:"兵庫",name:"神戸セーラー"},
+    {region:"近畿地方",pref:"兵庫",name:"神戸ポートタワー"},
     {region:"近畿地方",pref:"兵庫",name:"神戸中華街"},
     {region:"近畿地方",pref:"兵庫",name:"淡路玉ねぎ"},
-    {region:"近畿地方",pref:"兵庫",name:"神戸ポートタワー"},
     {region:"近畿地方",pref:"兵庫",name:"姫路千姫"},
-    {region:"近畿地方",pref:"兵庫",name:"コウノトリ"},
     {region:"近畿地方",pref:"奈良",name:"鹿"},
     {region:"近畿地方",pref:"奈良",name:"大仏"},
     {region:"近畿地方",pref:"和歌山",name:"パンダ"},
     {region:"近畿地方",pref:"和歌山",name:"みかん"},
-    {region:"四国地方",pref:"鳴門",name:"渦潮"},
-    {region:"四国地方",pref:"香川",name:"さぬきうどん"},
-    {region:"四国地方",pref:"愛媛",name:"みかん"},
-    {region:"四国地方",pref:"高知",name:"坂本龍馬"},
-    {region:"中国地方",pref:"瀬戸内",name:"瀬戸内レモン"},
     {region:"中国地方",pref:"島根",name:"縁結び"},
-    {region:"中国地方",pref:"岡山",name:"桃太郎"},
     {region:"中国地方",pref:"岡山",name:"桃から生まれた桃太郎"},
+    {region:"中国地方",pref:"岡山",name:"桃太郎"},
+    {region:"中国地方",pref:"広島",name:"お好み焼"},
     {region:"中国地方",pref:"広島",name:"もみじ饅頭"},
     {region:"中国地方",pref:"広島",name:"宮島の鹿"},
     {region:"中国地方",pref:"広島",name:"尾道ラーメン"},
-    {region:"中国地方",pref:"広島",name:"お好み焼"},
-    {region:"中国地方",pref:"宮島",name:"しゃもじ"},
     {region:"中国地方",pref:"山口",name:"ふく"},
+    {region:"中国地方",pref:"宮島",name:"しゃもじ"},
     {region:"中国地方",pref:"山陰",name:"いなばの白うさぎ"},
+    {region:"中国地方",pref:"瀬戸内",name:"瀬戸内レモン"},
+    {region:"四国地方",pref:"香川",name:"さぬきうどん"},
+    {region:"四国地方",pref:"愛媛",name:"みかん"},
+    {region:"四国地方",pref:"高知",name:"坂本龍馬"},
+    {region:"四国地方",pref:"鳴門",name:"渦潮"},
     {region:"九州地方",pref:"福岡",name:"あまおう"},
-    {region:"九州地方",pref:"福岡",name:"明太子"},
     {region:"九州地方",pref:"福岡",name:"とんこつラーメン"},
-    {region:"九州地方",pref:"福岡",name:"北九州バナナの叩き売り"},
     {region:"九州地方",pref:"福岡",name:"にわか"},
+    {region:"九州地方",pref:"福岡",name:"北九州バナナの叩き売り"},
+    {region:"九州地方",pref:"福岡",name:"明太子"},
     {region:"九州地方",pref:"佐賀",name:"バルーン"},
     {region:"九州地方",pref:"長崎",name:"カステラ"},
+    {region:"九州地方",pref:"熊本",name:"すいか"},
     {region:"九州地方",pref:"熊本",name:"熊本城"},
     {region:"九州地方",pref:"熊本",name:"辛子れんこん"},
-    {region:"九州地方",pref:"熊本",name:"すいか"},
-    {region:"九州地方",pref:"宮崎",name:"マンゴー"},
-    {region:"九州地方",pref:"宮崎",name:"サーフィン"},
     {region:"九州地方",pref:"大分",name:"温泉"},
+    {region:"九州地方",pref:"宮崎",name:"サーフィン"},
+    {region:"九州地方",pref:"宮崎",name:"マンゴー"},
+    {region:"九州地方",pref:"鹿児島",name:"芋焼酎"},
     {region:"九州地方",pref:"鹿児島",name:"黒豚"},
     {region:"九州地方",pref:"鹿児島",name:"桜島"},
     {region:"九州地方",pref:"鹿児島",name:"氷しろくま"},
@@ -232,40 +239,97 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     {region:"九州地方",pref:"沖縄",name:"ジンベエザメ"},
     {region:"九州地方",pref:"沖縄",name:"紅いもタルト"},
     {region:"九州地方",pref:"奄美",name:"アマミノクロウサギ"},
-    {region:"その他",pref:"温泉地",name:"温泉"},
+    {region:"海外",pref:"オーストラリア",name:"カンガルー"},
+    {region:"海外",pref:"オーストラリア",name:"コアラ"},
+    {region:"海外",pref:"マカオ",name:"アズレージョ"},
+    {region:"海外",pref:"マカオ",name:"エッグタルト"},
+    {region:"海外",pref:"マカオ",name:"セントポール"},
+    {region:"海外",pref:"香港",name:"エッグワッフル"},
+    {region:"海外",pref:"香港",name:"カンフー"},
+    {region:"海外",pref:"香港",name:"ビクトリアハーバー"},
+    {region:"その他",pref:"JR東海・西日本",name:"Dr.Yellow"},
+    {region:"その他",pref:"JR東海・西日本",name:"N700S"},
+    {region:"その他",pref:"JR東日本",name:"E7"},
+    {region:"その他",pref:"JR東日本",name:"はやぶさ"},
     {region:"その他",pref:"リゾート",name:"スキー冬季限定"},
     {region:"その他",pref:"リゾート",name:"スノボー冬季限定"},
-    {region:"その他",pref:"JR東日本",name:"はやぶさ"},
-    {region:"その他",pref:"JR東日本",name:"E7"},
-    {region:"その他",pref:"JR東海・西日本",name:"N700S"},
-    {region:"その他",pref:"JR東海・西日本",name:"Dr.Yellow"},
-    {region:"その他",pref:"空港",name:"パイロット"},
-    {region:"海外",pref:"マカオ",name:"セントポール"},
-    {region:"海外",pref:"マカオ",name:"エッグタルト"},
-    {region:"海外",pref:"マカオ",name:"アズレージョ"},
-    {region:"海外",pref:"香港",name:"エッグワッフル"},
-    {region:"海外",pref:"香港",name:"ビクトリアハーバー"},
-    {region:"海外",pref:"香港",name:"カンフー"},
-    {region:"海外",pref:"オーストラリア",name:"コアラ"},
-    {region:"海外",pref:"オーストラリア",name:"カンガルー"}
+    {region:"その他",pref:"温泉地",name:"温泉"},
+    {region:"その他",pref:"空港",name:"パイロット"}
   ];
+  // <<<AUTO-CATALOG-END>>>
 
   // --- 旧データに「沖縄地方」が残っていても九州地方へマップする ---
   function migrateRegion(v){ return v==="沖縄地方" ? "九州地方" : v; }
 
+  // 都道府県表記の統一（東京都/東京→東京、京都府→京都、大阪府→大阪、他は末尾の県・府を外す。北海道はそのまま）
+  function normalizePref(p){
+    let s = String(p || '').trim();
+    if (!s) return '';
+    if (s === '北海道') return s;
+    if (s === '東京都' || s === '東京') return '東京';
+    if (s === '京都府' || s === '京都') return '京都';
+    if (s === '大阪府' || s === '大阪') return '大阪';
+    // 一般: 末尾の「県」「府」を外す（「都」は外さない）
+    s = s.replace(/県$/, '').replace(/府$/, '');
+    return s;
+  }
+
+  // 正規化キー＆ホワイトリスト（FULL にある組み合わせだけ許可）
+  function normalizedKey(region, pref, name){
+    const r = migrateRegion(String(region || ''));
+    const p = normalizePref(pref);
+    const n = String(name || '');
+    return `${r}__${p}__${n}`;
+  }
+  const VALID_KEY_SET = new Set(FULL.map(x => normalizedKey(x.region, x.pref, x.name)));
+
   function today(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
   function normalize(x){
     return{
-      region:migrateRegion(String(x.region||'')),
-      pref:String(x.pref||''),
-      name:String(x.name||''),
-      owned:!!x.owned,
+      region: migrateRegion(String(x.region||'')),
+      pref:   normalizePref(x.pref),
+      name:   String(x.name||''),
+      owned:  !!x.owned,
       ownedAt:x.ownedAt||null
     };
   }
-  function load(){try{const a=JSON.parse(localStorage.getItem(LS_KEY));if(Array.isArray(a))return a.map(normalize);return null}catch{return null}}
-  let items=load()||FULL.map(x=>normalize(x));
+  // 公式外や重複を除去
+  function sanitize(arr){
+    const out = [];
+    const seen = new Set();
+    for(const it0 of (arr || [])){
+      const it = normalize(it0);
+      const k = normalizedKey(it.region, it.pref, it.name);
+      if(!VALID_KEY_SET.has(k)) continue; // FULLに無い → 捨てる
+      if(seen.has(k)) continue;           // 重複も除去
+      out.push(it); seen.add(k);
+    }
+    return out;
+  }
+  function load(){
+    try{
+      const a=JSON.parse(localStorage.getItem(LS_KEY));
+      if(Array.isArray(a)) return a;
+      return null;
+    }catch{ return null }
+  }
 
+  // FULL にあって items に無いものを未所持で補充する。
+  // 自動更新でカタログが増えたとき、localStorage に古い items が残っていても
+  // 新商品が画面に出るようにするための処理。既存の所持状態には一切触らない。
+  function mergeCatalog(list){
+    const out = [...list];
+    const have = new Set(out.map(it => normalizedKey(it.region, it.pref, it.name)));
+    for(const x of FULL){
+      const k = normalizedKey(x.region, x.pref, x.name);
+      if(!have.has(k)){ out.push(normalize(x)); have.add(k); }
+    }
+    return out;
+  }
+
+  // 初期ロード：正規化＋ホワイトリストでクリーン化してから、新カタログを合流
+  let items = mergeCatalog(sanitize(load() || FULL));
+  // 以後の処理で使う前にローカルへ書き戻して正規化を確定させる
   function setStatus(t,cls=''){ syncStatus.textContent=t; syncStatus.className='small '+(cls||''); }
 
   /* ===== UI要素 ===== */
@@ -286,6 +350,24 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
   fb.auth = getAuth(fb.app);
   fb.db = getFirestore(fb.app);
   const provider = new GoogleAuthProvider();
+
+  // 保存（ローカル/クラウド）
+  let pushTimer=null;
+  function pushToCloudDebounced(){
+    if(pushTimer) clearTimeout(pushTimer);
+    pushTimer=setTimeout(()=>{ if(fb.docRef) setDoc(fb.docRef,{items, updatedAt: Date.now()}); },300);
+  }
+  function save(){
+    try{
+      localStorage.setItem(LS_KEY,JSON.stringify(items));
+      if(fb.connected && !fb.applying) pushToCloudDebounced();
+    }catch(e){
+      console.error('localStorage save failed', e);
+      setStatus('保存に失敗（ローカルストレージ）','warn');
+    }
+  }
+  // ★初回ロード直後に保存（東京都→東京 等の統一と不要データ除去を確定）
+  save();
 
   loginBtn.addEventListener('click', async () => {
     try{ await signInWithPopup(fb.auth, provider); }
@@ -310,36 +392,25 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     return true;
   }
   function mergeItems(remote, local){
-    // 正規化＋地域移行を両方に適用
+    // 両方 normalize 済みデータでキー作成 → 東京都/東京などは自動マージ
     const map=new Map();
-    for(const it of local.map(normalize)){
-      map.set(it.region+'__'+it.pref+'__'+it.name, it);
+    for(const it of sanitize(local)){ // 念のためローカル側もクリーン化
+      const k = normalizedKey(it.region, it.pref, it.name);
+      map.set(k, it);
     }
-    for(const it0 of remote){
-      const it=normalize(it0);
-      const k=it.region+'__'+it.pref+'__'+it.name;
+    for(const it0 of sanitize(remote)){ // リモート側もクリーン化
+      const it = it0;
+      const k = normalizedKey(it.region, it.pref, it.name);
       if(!map.has(k)) map.set(k, it);
       else{
         const a=map.get(k);
         map.set(k,{...a,...it,owned:!!(a.owned||it.owned),ownedAt:a.ownedAt||it.ownedAt||null});
       }
     }
-    return [...map.values()];
+    // 相手側がまだ古いカタログのままでも、新商品が画面から消えないよう合流させる
+    return mergeCatalog(sanitize([...map.values()]));
   }
-  let pushTimer=null;
-  function pushToCloudDebounced(){
-    if(pushTimer) clearTimeout(pushTimer);
-    pushTimer=setTimeout(()=>{ if(fb.docRef) setDoc(fb.docRef,{items, updatedAt: Date.now()}); },300);
-  }
-  function save(){
-    try{
-      localStorage.setItem(LS_KEY,JSON.stringify(items));
-      if(fb.connected && !fb.applying) pushToCloudDebounced();
-    }catch(e){
-      console.error('localStorage save failed', e);
-      setStatus('保存に失敗（ローカルストレージ）','warn');
-    }
-  }
+
   function connect(){
     if(!ensureLoggedIn()) return;
     const code=(familyCodeInput.value||'').trim();
@@ -352,7 +423,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     getDoc(fb.docRef).then(async (snap)=>{
       if(snap.exists()){
         fb.applying=true;
-        const remote=(snap.data().items||[]).map(normalize);
+        const remote=sanitize(snap.data().items||[]);
         items = mergeItems(remote, items);
         save();
         fb.applying=false;
@@ -363,7 +434,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
       if(fb.unsub) fb.unsub();
       fb.unsub = onSnapshot(fb.docRef, s=>{
         if(!s.exists()) return;
-        const remote=(s.data().items||[]).map(normalize);
+        const remote=sanitize(s.data().items||[]);
         fb.applying=true; items = mergeItems(remote, items); save(); fb.applying=false; render();
       }, e=>showError('onSnapshot失敗', e));
 
@@ -420,7 +491,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     const csv=toCSV(sorted);
     downloadBlob(filename, csv);
   }
-  btnCSVAll.addEventListener('click', ()=>exportCSV(items,'chiikawa_all.csv'));
+  document.getElementById('btnCSVAll').addEventListener('click', ()=>exportCSV(items,'chiikawa_all.csv'));
 
   /* ===== 一覧を同一ページにオーバーレイ表示（ポップアップ不要） ===== */
   function openPrintAll() {
@@ -501,7 +572,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
   document.getElementById('btnPrint').addEventListener('click', openPrintAll);
 
   /* ===== 画面描画（2カラム） ===== */
-  const regionSummaryEl = new Map(); // 地域→summaryエレメント参照
+  const regionSummaryEl = new Map();
 
   function updateStats(){
     const ownTotal=items.filter(x=>x.owned).length;
@@ -513,7 +584,6 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     app.innerHTML='';
     regionSummaryEl.clear();
 
-    // migrateRegion を先に当ててから Set で重複排除
     const regions=[...new Set(items.map(it=>migrateRegion(it.region)))]
       .sort((a,b)=>(REGION_ORDER.indexOf(a)+1||999)-(REGION_ORDER.indexOf(b)+1||999)||a.localeCompare(b,'ja'));
 
@@ -530,12 +600,11 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
       const summary=document.createElement('summary');
       summary.textContent=`${r} ${ownR}/${rItems.length}`;
       details.appendChild(summary);
-      regionSummaryEl.set(r, summary); // 後で即時更新に使う
+      regionSummaryEl.set(r, summary);
 
       const inner=document.createElement('div');
       inner.className='inner';
 
-      // 都道府県でグルーピング（items の実体参照）
       const byPref={};
       for(const it of rItems){
         (byPref[it.pref]||(byPref[it.pref]=[])).push(it);
@@ -545,7 +614,6 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
         return (ra-rb) || a.localeCompare(b,'ja');
       });
 
-      // 2カラムテーブル
       const wrap=document.createElement('div'); wrap.className='tableWrap';
       const table=document.createElement('table'); table.className='tbl';
       const thead=document.createElement('thead'); const trh=document.createElement('tr');
@@ -566,36 +634,27 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
           const rowBox=document.createElement('div'); rowBox.className='row';
 
           const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!!it.owned;
-          // details の開閉誤反応を防止
           cb.addEventListener('click', (e)=> e.stopPropagation());
           cb.addEventListener('change', (ev) => {
             const checked = ev.currentTarget.checked;
-
-            // モデル更新（items の実体）
             it.owned = checked;
             it.ownedAt = checked ? (it.ownedAt || today()) : null;
 
-            // UI即時更新（この行）
             const ownedBadge = rowBox.querySelector('span.badge');
             const dateSmall = rowBox.querySelector('span.small-muted');
             ownedBadge.classList.toggle('yes', checked);
             ownedBadge.textContent = checked ? '所持' : '未所持';
             dateSmall.textContent = it.ownedAt ? `(${it.ownedAt})` : '';
 
-            // 地域サマリも更新
             const rNow = migrateRegion(it.region);
             const rAll = items.filter(x=>migrateRegion(x.region)===rNow);
             const rOwn = rAll.filter(x=>x.owned).length;
             const sumEl = regionSummaryEl.get(rNow);
             if(sumEl) sumEl.textContent = `${rNow} ${rOwn}/${rAll.length}`;
 
-            // 全体進捗も更新
             updateStats();
 
-            // 保存（失敗してもUIは維持）
             try { save(); } catch(e){ console.error('save() failed', e); setStatus('保存に失敗（コンソール参照）','warn'); }
-
-            // details/summary 誤反応防止
             ev.stopPropagation();
           });
 

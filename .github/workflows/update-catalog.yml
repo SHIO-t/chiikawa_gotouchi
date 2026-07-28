@@ -1,0 +1,59 @@
+name: ご当地ちいかわ カタログ自動更新
+
+# 毎週月曜 09:00 JST に kakkon.net / jp-api.com を見に行き、
+# 商品リストに差分があれば Pull Request を作る。
+# 自動マージも自動デプロイもしない（新商品の都道府県は人が確認するため）。
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'   # 毎週月曜 00:00 UTC = 09:00 JST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: カタログを取得して FULL を更新
+        run: npm run update-list
+
+      - name: 差分の有無を判定
+        id: diff
+        run: |
+          if git diff --quiet -- chiikawa_checklist_claude.html; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "商品リストに変更はありませんでした。"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --stat -- chiikawa_checklist_claude.html
+          fi
+
+      - name: Pull Request を作成
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: auto/update-catalog
+          delete-branch: true
+          commit-message: 'ご当地ちいかわ 商品リスト自動更新'
+          title: 'ご当地ちいかわ 商品リスト自動更新'
+          body-path: scripts/catalog-report.md
+          labels: automated
+          add-paths: |
+            chiikawa_checklist_claude.html
+
+      - name: 差分レポートを成果物として保存
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: catalog-report
+          path: scripts/catalog-report.md
+          if-no-files-found: warn

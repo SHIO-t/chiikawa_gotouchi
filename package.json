@@ -1,0 +1,10 @@
+{
+  "name": "chiikawa-gotouchi",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ちいかわ ご当地キーホルダー 所持チェックリスト",
+  "scripts": {
+    "update-list": "node scripts/update-catalog.mjs"
+  }
+}
