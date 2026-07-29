@@ -33,13 +33,18 @@
     .badge.yes{border-color:#065f46;color:#10b981;background:rgba(16,185,129,.08)}
     .small-muted{font-size:12px;color:#94a3b8;margin-left:8px}
 
-    /* ===== 新着のお知らせ ===== */
-    #newsBar:empty{display:none}
+    /* ===== 新着のお知らせ =====
+       新着が無いときも枠自体は残す（何も無いことが分かるように）。
+       その場合は .quiet を付けて、アクセント色を使わない静かな見た目にする。 */
     .news{
       margin:10px 0 2px;padding:10px 12px;border-radius:10px;
       background:rgba(34,211,238,.08);border:1px solid #164e63;
       display:flex;gap:10px;align-items:flex-start;
     }
+    .news.quiet{background:transparent;border-color:#1f2937}
+    .news.quiet .ic{opacity:.5}
+    .news.quiet .ttl{color:#94a3b8;font-weight:600}
+    .news.quiet .lst{color:#64748b}
     .news .ic{font-size:16px;line-height:1.4}
     .news .bd{flex:1;min-width:0}
     .news .ttl{font-weight:700;font-size:14px;color:#67e8f9}
@@ -1048,7 +1053,20 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
   function renderNews(){
     const bar = document.getElementById('newsBar');
     bar.innerHTML = '';
-    if(!newArrivals.length) return;
+
+    // 新着が無いときも枠は出す。何も起きていないことが分かるようにするため
+    if(!newArrivals.length){
+      const quiet = document.createElement('div');
+      quiet.className = 'news quiet';
+      quiet.innerHTML = `
+        <div class="ic">🔔</div>
+        <div class="bd">
+          <div class="ttl">新着のお知らせはありません</div>
+          <div class="lst">リストは全${items.length}件。新しい商品が追加されるとここに出ます。</div>
+        </div>`;
+      bar.appendChild(quiet);
+      return;
+    }
 
     const SHOW = 8;
     const shown = newArrivals.slice(0, SHOW);
