@@ -101,8 +101,9 @@
     .rhead .cnt{font-size:12px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
     .rhead .done{color:var(--mint-ink)}
 
-    .pgroup{margin:0 0 14px}
-    .plabel{font-size:12px;font-weight:700;color:var(--ink-3);margin:0 0 7px;letter-spacing:.03em}
+    /* 都道府県はタイル側に小さく出す。県ごとにグリッドを分けると
+       1件しかない県が丸ごと1行を占めてしまい、縦に伸びすぎるため。 */
+    .tile .tpref{font-size:9.5px;font-weight:700;color:var(--ink-3);letter-spacing:.04em;line-height:1}
 
     /* ---- 図鑑タイル ---- */
     .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:9px}
@@ -1375,6 +1376,55 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     return m ? `${m[1].slice(2)}/${Number(m[2])}/${Number(m[3])}` : '';
   }
 
+  /* ===== タイルのアイコン =====
+     商品写真が使えるようになるまでの見分け用。名称に対して絵文字を割り当て、
+     未定義のものは地域ごとの既定アイコンにフォールバックする。 */
+  const ICON = {
+    // 北海道・東北
+    'くま':'🐻','シマエナガ':'🐦','メロン':'🍈','ラベンダー':'💜','札幌テレビ塔':'🗼',
+    '小樽運河':'🚣','函館の夜景':'🌃','北海道':'🗺️','ねぶた祭':'🏮','りんご':'🍎',
+    'わんこそば':'🍜','銀河鉄道':'🚂','こけし':'🎎','伊達政宗':'🥷','笹かま':'🍥',
+    'なまはげ':'👹','竿燈まつり':'🏮','秋田犬':'🐕','さくらんぼ':'🍒','だだちゃ豆':'🫛',
+    '花笠':'👒','米沢牛':'🥩','ハワイアン':'🌺','赤べこ':'🐮','桃':'🍑','白虎隊':'⚔️',
+    // 関東
+    '黄門様':'👴','水戸納豆':'🫘','スカイベリー':'🍓','関東・栃木レモン':'🍋','三猿':'🙈',
+    '藤の花':'🌸','だるま':'🎯','焼きまんじゅう':'🍡','草津温泉':'♨️','さつまいも':'🍠',
+    '深谷ネギ':'🌱','行徳みこし':'🎊','落花生':'🥜','梨':'🍐','スカイツリー':'🗼',
+    '東京タワー':'🗼','東京パンダ':'🐼','東京駅丸の内駅舎':'🚉','雷門':'⛩️','横浜カンフー':'🥋',
+    '横浜金の豚':'🐷','鎌倉大仏さま':'🧘','寄木細工':'🧩','大涌谷黒たまご':'🥚','箱根温泉まんじゅう':'♨️',
+    // 中部
+    'トキ':'🦢','笹団子':'🍡','ホタルイカ':'🦑','兼六園':'🌳','恐竜':'🦕','ぶどう':'🍇',
+    '信州オコジョ':'🐾','信州りんご':'🍎','さるぼぼ':'🧸','合掌造り':'🏠','いちご':'🍓',
+    'うなぎ':'🍱','お茶':'🍵','桜えび':'🦐','次郎長':'🎴','しゃちほこ':'🐟','小倉トースト':'🍞',
+    '富士山':'🗻',
+    // 近畿
+    '伊勢エビ':'🦞','真珠':'🫧','信楽たぬき':'🦝','忍者':'🥷','琵琶湖':'🌊','彦根城':'🏯',
+    'ニデック京都タワー':'🗼','金閣寺':'🛕','新選組':'⚔️','八ッ橋':'🍘','伏見稲荷':'⛩️',
+    '抹茶ソフト':'🍦','たこ焼':'🐙','ミックスジュース':'🥤','大阪のおばちゃん':'👩',
+    '大阪城':'🏯','通天閣':'🗼','コウノトリ':'🕊️','神戸セーラー':'⚓','神戸ポートタワー':'🗼',
+    '神戸中華街':'🏮','淡路玉ねぎ':'🧅','姫路千姫':'👸','鹿':'🦌','大仏':'🧘','パンダ':'🐼',
+    // 中国・四国
+    'みかん':'🍊','縁結び':'🎀','桃から生まれた桃太郎':'🍑','桃太郎':'👦','お好み焼':'🥘',
+    'もみじ饅頭':'🍁','宮島の鹿':'🦌','尾道ラーメン':'🍜','ふく':'🐡','しゃもじ':'🍚',
+    'いなばの白うさぎ':'🐰','瀬戸内レモン':'🍋','さぬきうどん':'🍲','坂本龍馬':'🗡️','渦潮':'🌀',
+    // 九州・沖縄
+    'あまおう':'🍓','とんこつラーメン':'🍜','にわか':'🎭','北九州バナナの叩き売り':'🍌',
+    '明太子':'🐟','バルーン':'🎈','カステラ':'🍰','すいか':'🍉','熊本城':'🏯',
+    '辛子れんこん':'🌶️','温泉':'♨️','サーフィン':'🏄','マンゴー':'🥭','芋焼酎':'🍶',
+    '黒豚':'🐖','桜島':'🌋','氷しろくま':'🍧','シーサー':'🦁','ジンベエザメ':'🦈',
+    '紅いもタルト':'🍠','アマミノクロウサギ':'🐇',
+    // 海外・その他
+    'カンガルー':'🦘','コアラ':'🐨','アズレージョ':'🔷','エッグタルト':'🥧','セントポール':'⛪',
+    'エッグワッフル':'🧇','カンフー':'🥋','ビクトリアハーバー':'🌉',
+    'Dr.Yellow':'🚄','N700S':'🚄','E7':'🚅','はやぶさ':'🚅',
+    'スキー冬季限定':'⛷️','スノボー冬季限定':'🏂','パイロット':'✈️',
+  };
+  const ICON_BY_REGION = {
+    '北海道地方':'❄️','東北地方':'🌾','関東地方':'🏙️','中部地方':'⛰️','近畿地方':'⛩️',
+    '中国地方':'🌊','四国地方':'🍊','九州地方':'🌺','海外':'🌏','その他':'🎫','未分類':'❓',
+  };
+  const iconFor = (it) => ICON[it.name] || ICON_BY_REGION[migrateRegion(it.region)] || '🧸';
+
   // 1枚のタイルを組み立てる。クリックで所持を切り替え、日付部分だけは別扱い。
   function buildTile(it){
     const tile = document.createElement('button');
@@ -1386,7 +1436,11 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
 
     const thumb = document.createElement('span');
     thumb.className = 'thumb';
-    thumb.textContent = '🧸';   // 商品画像を入れるまでの仮置き
+    thumb.textContent = iconFor(it);
+
+    const pf = document.createElement('span');
+    pf.className = 'tpref';
+    pf.textContent = it.pref || '';
 
     const nm = document.createElement('span');
     nm.className = 'tname';
@@ -1448,7 +1502,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
       if(!matchesView(it)) render();
     });
 
-    tile.append(thumb, nm, dt, chk);
+    tile.append(thumb, pf, nm, dt, chk);
     return tile;
   }
 
@@ -1508,27 +1562,17 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
           <span class="cnt${ownR === allR.length ? ' done' : ''}">${ownR}/${allR.length}</span>
         </div>`;
 
-      const byPref = new Map();
-      for(const it of shown.filter(it => migrateRegion(it.region) === r)){
-        if(!byPref.has(it.pref)) byPref.set(it.pref, []);
-        byPref.get(it.pref).push(it);
-      }
-      const prefs = [...byPref.keys()].sort((a,b) => (prefRank(a)-prefRank(b)) || a.localeCompare(b,'ja'));
-
-      for(const p of prefs){
-        const g = document.createElement('div');
-        g.className = 'pgroup';
-        const lb = document.createElement('div');
-        lb.className = 'plabel';
-        lb.textContent = p || '(未設定)';
-        const tiles = document.createElement('div');
-        tiles.className = 'tiles';
-        byPref.get(p)
-          .sort((a,b) => (a.name||'').localeCompare(b.name||'','ja'))
-          .forEach(it => tiles.appendChild(buildTile(it)));
-        g.append(lb, tiles);
-        sec.appendChild(g);
-      }
+      // 地域ごとに1つのグリッド。並びは 都道府県順 → 名称順
+      const tiles = document.createElement('div');
+      tiles.className = 'tiles';
+      shown
+        .filter(it => migrateRegion(it.region) === r)
+        .sort((a,b) =>
+          (prefRank(a.pref) - prefRank(b.pref)) ||
+          (a.pref||'').localeCompare(b.pref||'','ja') ||
+          (a.name||'').localeCompare(b.name||'','ja'))
+        .forEach(it => tiles.appendChild(buildTile(it)));
+      sec.appendChild(tiles);
       frag.appendChild(sec);
     }
 
