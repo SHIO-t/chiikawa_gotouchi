@@ -5,114 +5,256 @@
   <title>ちいかわ ご当地キーホルダー 所持チェック（家族共有・Googleログイン）</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    :root{--bg:#0f172a;--panel:#111827;--muted:#94a3b8;--text:#e5e7eb;--accent:#22d3ee;--accent2:#a78bfa;--ok:#34d399}
-    body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Noto Sans JP,Meiryo,sans-serif;background:#0b1225;color:var(--text)}
-    header{position:sticky;top:0;background:#0f172a;z-index:10;border-bottom:1px solid #1f2937}
-    .wrap{max-width:1100px;margin:auto;padding:12px}
-    h1{margin:0 0 8px}
-    input,select,button,textarea{margin:4px;padding:8px;border-radius:8px;border:1px solid #2b3a5d;background:#0b1327;color:var(--text)}
-    button{cursor:pointer;background:linear-gradient(135deg,var(--accent2),var(--accent));border:none}
-    .ghost{background:transparent;border:1px solid #2b3a5d}
-    .small{font-size:12px;color:#94a3b8}
-    details.region{margin:12px 0;border:1px solid #2b3a5d;border-radius:8px;overflow:hidden}
-    details.region>summary{list-style:none;cursor:pointer;padding:10px 12px;background:#0b1327;font-weight:700;color:var(--accent)}
-    details.region>summary::-webkit-details-marker{display:none}
-    details.region .inner{padding:8px 12px;background:#0f172a}
-    .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-    .ok{color:#10b981}
-    .warn{color:#f59e0b}
-    .hide{display:none}
-    /* ---- compact table view ---- */
-    .tableWrap{margin:8px 0}
-    .tbl{width:100%;border-collapse:collapse;border:1px solid #1f2937;background:#0b1327}
-    .tbl th,.tbl td{padding:8px 10px;border-bottom:1px solid #1f2937;text-align:left}
-    .tbl thead th{background:#0f172a;color:var(--muted);font-weight:600}
-    .tbl tr:hover{background:#0e1832}
-    .tbl td:first-child,.tbl th:first-child{white-space:nowrap;width:1%}
-    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:700;font-size:12px;border:1px solid #2b3a5d;margin-left:8px}
-    .badge.yes{border-color:#065f46;color:#10b981;background:rgba(16,185,129,.08)}
-    .small-muted{font-size:12px;color:#94a3b8;margin-left:8px}
+    /* ===== デザイントークン =====
+       ピンクの4段（--pink-1〜4）は白背景に対して順序ランプとして検証済み
+       （単一色相・輝度単調・段差・最明段2.22:1）。段の値は変えないこと。
+       文字に使う --pink-ink は 6.38:1、--mint-ink は 5.47:1。 */
+    :root{
+      --bg:#fbfaf7;
+      --surface:#ffffff;
+      --surface-2:#f6f2ec;
+      --line:#ece7df;
+      --line-2:#ddd5c9;
+
+      --ink:#1f1b18;
+      --ink-2:#6b6058;
+      --ink-3:#8a7f74;
+
+      --pink-1:#f48ebd; --pink-2:#e85d9d; --pink-3:#c93b7c; --pink-4:#9c1f5b;
+      --pink-ink:#b02466;
+      --pink-wash:#fdeff6;
+      --mint:#14b8a6;
+      --mint-ink:#0f766e;
+      --mint-wash:#e8faf7;
+
+      --r:16px; --r-sm:12px; --r-xs:9px;
+      --sh-1:0 1px 2px rgba(31,27,24,.05);
+      --sh-2:0 6px 20px -6px rgba(31,27,24,.16);
+      --sh-3:0 18px 48px -14px rgba(31,27,24,.28);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;background:var(--bg);color:var(--ink);
+      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans JP",sans-serif;
+      -webkit-font-smoothing:antialiased;
+    }
+    .wrap{max-width:1080px;margin:auto;padding:0 16px}
+    .hide{display:none !important}
+
+    /* ---- ボタンの基本形 ---- */
+    button{font:inherit;cursor:pointer;border-radius:999px;border:1px solid transparent;transition:background .15s,border-color .15s,color .15s,transform .1s}
+    button:active{transform:scale(.97)}
+    .btn{padding:9px 16px;font-size:14px;font-weight:600;background:var(--ink);color:#fff}
+    .btn:hover{background:#000}
+    .btn.accent{background:var(--pink-2);color:#fff}
+    .btn.accent:hover{background:var(--pink-3)}
+    .btn.ghost{background:var(--surface);color:var(--ink-2);border-color:var(--line-2)}
+    .btn.ghost:hover{background:var(--surface-2);color:var(--ink)}
+    .btn.sm{padding:6px 12px;font-size:13px}
+    .icon-btn{
+      width:38px;height:38px;display:grid;place-items:center;font-size:17px;
+      background:var(--surface);border-color:var(--line-2);color:var(--ink-2);
+    }
+    .icon-btn:hover{background:var(--surface-2)}
+    input,select{
+      font:inherit;padding:9px 12px;border-radius:var(--r-sm);
+      border:1px solid var(--line-2);background:var(--surface);color:var(--ink);
+    }
+    input:focus,select:focus,button:focus-visible{outline:2px solid var(--pink-2);outline-offset:1px}
+    .small{font-size:12px;color:var(--ink-2)}
+    .small-muted{font-size:11.5px;color:var(--ink-3);margin-left:7px;font-weight:500}
+
+    /* ---- ヘッダー ---- */
+    header.topbar{
+      position:sticky;top:0;z-index:20;background:rgba(251,250,247,.88);
+      backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--line);
+    }
+    .brandrow{display:flex;align-items:center;gap:12px;padding:14px 0 10px}
+    h1{margin:0;font-size:19px;font-weight:700;letter-spacing:.01em;flex:1;min-width:0}
+    h1 small{display:block;font-size:11px;font-weight:600;color:var(--ink-3);letter-spacing:.08em;margin-bottom:2px}
+
+    /* 進捗ヒーロー */
+    .phero{display:flex;align-items:center;gap:14px;padding-bottom:12px}
+    .phero .nums{font-size:15px;font-weight:600;white-space:nowrap}
+    .phero .nums b{font-size:26px;font-weight:700;margin-right:1px}
+    .phero .nums span{color:var(--ink-3);font-weight:600}
+    .phero .bar{flex:1;height:10px;border-radius:999px;background:var(--surface-2);overflow:hidden;min-width:60px}
+    .phero .bar>i{display:block;height:100%;background:var(--pink-2);border-radius:0 999px 999px 0;transition:width .35s}
+    .phero .pct{font-size:14px;font-weight:700;color:var(--pink-ink);white-space:nowrap}
+
+    /* ツールバー（検索＋絞り込み） */
+    .toolbar{display:flex;gap:8px;align-items:center;padding-bottom:12px;flex-wrap:wrap}
+    .search{position:relative;flex:1;min-width:190px}
+    .search input{width:100%;padding-left:34px}
+    .search .mag{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--ink-3);font-size:14px;pointer-events:none}
+    .search .clr{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:24px;height:24px;border-radius:999px;border:none;background:var(--surface-2);color:var(--ink-2);display:grid;place-items:center;font-size:13px}
+    .seg{display:flex;background:var(--surface-2);border-radius:999px;padding:3px;gap:2px}
+    .seg button{padding:6px 13px;font-size:13px;font-weight:600;background:transparent;color:var(--ink-2);border:none}
+    .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--sh-1)}
+
+    /* ---- 地域セクション ---- */
+    .region{margin:22px 0}
+    .rhead{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+    .rhead h2{margin:0;font-size:15px;font-weight:700;white-space:nowrap}
+    .rhead .bar{flex:1;height:6px;border-radius:999px;background:var(--surface-2);overflow:hidden;min-width:40px}
+    .rhead .bar>i{display:block;height:100%;background:var(--pink-2);border-radius:0 999px 999px 0}
+    .rhead .cnt{font-size:12px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+    .rhead .done{color:var(--mint-ink)}
+
+    .pgroup{margin:0 0 14px}
+    .plabel{font-size:12px;font-weight:700;color:var(--ink-3);margin:0 0 7px;letter-spacing:.03em}
+
+    /* ---- 図鑑タイル ---- */
+    .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:9px}
+    .tile{
+      position:relative;display:flex;flex-direction:column;gap:7px;
+      padding:9px;border-radius:var(--r-sm);border:1px solid var(--line);
+      background:var(--surface);text-align:left;box-shadow:var(--sh-1);
+      transition:transform .12s,box-shadow .12s,border-color .12s,background .12s;
+    }
+    .tile:hover{transform:translateY(-2px);box-shadow:var(--sh-2)}
+    .tile .thumb{
+      aspect-ratio:1/1;border-radius:var(--r-xs);background:var(--surface-2);
+      display:grid;place-items:center;font-size:24px;overflow:hidden;position:relative;
+    }
+    .tile .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+    .tile .tname{font-size:12.5px;font-weight:600;line-height:1.35;color:var(--ink);word-break:break-word}
+    .tile .tdate{
+      font-size:10.5px;color:var(--ink-3);font-variant-numeric:tabular-nums;
+      background:none;border:none;padding:2px 0 0;margin:0;text-align:left;border-radius:4px;
+    }
+    .tile .tdate:hover{color:var(--pink-ink);text-decoration:underline;text-underline-offset:2px}
+    .tile .dateedit{font-size:11px;padding:3px 5px;border-radius:6px;width:100%}
+    /* 未所持は彩度を落として沈める */
+    .tile:not(.owned) .thumb{filter:grayscale(1);opacity:.42}
+    .tile:not(.owned) .tname{color:var(--ink-2);font-weight:500}
+    /* 所持はピンクで点灯 */
+    .tile.owned{border-color:var(--pink-1);background:var(--pink-wash)}
+    .tile .chk{
+      position:absolute;top:6px;right:6px;width:21px;height:21px;border-radius:999px;
+      display:grid;place-items:center;font-size:12px;font-weight:700;
+      background:var(--surface);border:1px solid var(--line-2);color:transparent;
+      box-shadow:var(--sh-1);
+    }
+    .tile.owned .chk{background:var(--pink-2);border-color:var(--pink-2);color:#fff}
+
+    .emptystate{padding:44px 16px;text-align:center;color:var(--ink-3);font-size:14px}
+
+    /* ---- 設定シート ---- */
+    .sheet{
+      position:fixed;inset:0;z-index:40;display:none;
+      background:rgba(31,27,24,.32);backdrop-filter:blur(2px);
+    }
+    .sheet.open{display:block}
+    .sheet .panel{
+      position:absolute;right:0;top:0;bottom:0;width:min(380px,100%);
+      background:var(--surface);border-left:1px solid var(--line);
+      box-shadow:var(--sh-3);padding:18px;overflow:auto;
+    }
+    .sheet h3{margin:0 0 4px;font-size:15px}
+    .sheet .sec{padding:16px 0;border-bottom:1px solid var(--line)}
+    .sheet .sec:last-child{border-bottom:none}
+    .sheet .sec p{margin:4px 0 10px;font-size:12.5px;color:var(--ink-2);line-height:1.6}
+    .sheet .stack{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    /* 家族コードは幅が要るので単独の行に置く */
+    .sheet .stack input{flex-basis:100%;width:100%}
+    /* シートを開いている間は後ろを動かさない */
+    body.locked{overflow:hidden}
+    .ok{color:var(--mint-ink)}
+    .warn{color:#b45309}
 
     /* ===== 新着のお知らせ =====
-       新着が無いときも枠自体は残す（何も無いことが分かるように）。
-       その場合は .quiet を付けて、アクセント色を使わない静かな見た目にする。 */
+       新着が無いときも枠自体は残す。その場合は .quiet を付けて、
+       アクセント色を使わない静かな見た目にする。 */
     .news{
-      margin:10px 0 2px;padding:10px 12px;border-radius:10px;
-      background:rgba(34,211,238,.08);border:1px solid #164e63;
+      margin:0 0 12px;padding:11px 13px;border-radius:var(--r-sm);
+      background:var(--pink-wash);border:1px solid var(--pink-1);
       display:flex;gap:10px;align-items:flex-start;
     }
-    .news.quiet{background:transparent;border-color:#1f2937}
-    .news.quiet .ic{opacity:.5}
-    .news.quiet .ttl{color:#94a3b8;font-weight:600}
-    .news.quiet .lst{color:#64748b}
-    .news .ic{font-size:16px;line-height:1.4}
+    .news.quiet{background:var(--surface);border-color:var(--line)}
+    .news.quiet .ic{opacity:.45}
+    .news.quiet .ttl{color:var(--ink-2)}
+    .news.quiet .lst{color:var(--ink-3)}
+    .news .ic{font-size:15px;line-height:1.45}
     .news .bd{flex:1;min-width:0}
-    .news .ttl{font-weight:700;font-size:14px;color:#67e8f9}
-    .news .lst{margin:5px 0 0;font-size:13px;color:#cbd5e1;line-height:1.7}
+    .news .ttl{font-weight:700;font-size:13.5px;color:var(--pink-ink)}
+    .news .lst{margin:4px 0 0;font-size:12.5px;color:var(--ink-2);line-height:1.75}
     .news .lst button{
-      background:none;border:none;padding:0;margin:0 2px;color:#cbd5e1;
-      font:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:2px;
+      background:none;border:none;padding:0;margin:0 1px;color:var(--ink-2);
+      font:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:2px;border-radius:3px;
     }
-    .news .lst button:hover{color:#67e8f9}
+    .news .lst button:hover{color:var(--pink-ink)}
     .news .act{display:flex;gap:6px;flex-shrink:0}
-    .news .act button{margin:0;padding:5px 10px;font-size:12px}
     @media(max-width:560px){
       .news{flex-wrap:wrap}
       .news .act{width:100%;justify-content:flex-end}
     }
 
+    /* ---- 狭い画面の詰め ---- */
+    @media(max-width:560px){
+      h1{font-size:16px;line-height:1.35}
+      h1 small{font-size:10px}
+      /* 狭い画面では見出しを1行に収める */
+      h1 .t-long{display:none}
+      .brandrow{gap:8px;padding:12px 0 8px}
+      #btnDash{padding:8px 13px;font-size:13px}
+      .icon-btn{width:34px;height:34px;font-size:15px}
+      .phero .nums b{font-size:23px}
+      /* タイルは3列にして、1画面に入る数を増やす */
+      .tiles{grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:7px}
+      .tile{padding:7px;gap:6px}
+      .tile .tname{font-size:11.5px}
+      .tile .chk{width:19px;height:19px;font-size:11px}
+      .rhead h2{font-size:14px}
+    }
+
     /* ===== ダッシュボード =====
-       配色は cyan 単色の順序ランプ（--seq-1〜4）。dataviz の ordinal チェック
-       （単一色相・輝度単調・段差・最明段のコントラスト）を surface #0b1327 に対して
-       通したものなので、段の値を勝手に変えないこと。
+       ヒートマップの配色はピンク単色の順序ランプ（--pink-1〜4）。
+       白背景に対して dataviz の ordinal チェックを通してあるので段の値は変えないこと。
        --seq-0 は「0件」専用でわざと背景に沈めてあり、必ず数値ラベルを併記する。 */
     #dashOverlay{
-      position:fixed;inset:0;z-index:9998;display:none;overflow:auto;
-      background:#0b1225;color:#e5e7eb;
-      --d-surface:#0b1327; --d-plane:#0f172a;
-      --d-ink:#e5e7eb; --d-ink2:#94a3b8; --d-muted:#64748b;
-      --d-grid:#1f2937; --d-line:#2b3a5d;
-      --seq-0:#131c33; --seq-1:#0e7490; --seq-2:#0891b2; --seq-3:#22d3ee; --seq-4:#67e8f9;
-      --d-ok:#34d399;
+      position:fixed;inset:0;z-index:40;display:none;overflow:auto;
+      background:var(--bg);color:var(--ink);
+      --seq-0:#f6f2ec;
     }
-    #dashOverlay .dwrap{max-width:1100px;margin:0 auto;padding:16px 16px 48px}
-    #dashOverlay h2{margin:0;font-size:20px}
-    #dashOverlay h3{margin:0 0 12px;font-size:14px;font-weight:600;color:var(--d-ink2)}
-    .dcard{background:var(--d-surface);border:1px solid var(--d-grid);border-radius:12px;padding:16px;margin-bottom:12px}
+    #dashOverlay .dwrap{max-width:1080px;margin:0 auto;padding:16px 16px 56px}
+    #dashOverlay h2{margin:0;font-size:22px;font-weight:700}
+    #dashOverlay h3{margin:0 0 13px;font-size:13px;font-weight:700;color:var(--ink-3);letter-spacing:.03em}
+    .dcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin-bottom:12px;box-shadow:var(--sh-1)}
     .dgrid{display:grid;gap:12px}
     .dgrid.k4{grid-template-columns:repeat(2,1fr)}
     @media(min-width:720px){.dgrid.k4{grid-template-columns:repeat(4,1fr)}}
 
-    /* ヒーロー数値：sans のまま、大きい数字は比例数字（tabular にしない） */
+    /* ヒーロー数値：大きい数字は比例数字（tabular にしない） */
     .dhero{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px}
-    .dhero .big{font-size:56px;line-height:1;font-weight:600;color:var(--d-ink)}
-    .dhero .sub{font-size:14px;color:var(--d-ink2)}
-    .dmeter{height:14px;border-radius:999px;background:rgba(34,211,238,.14);overflow:hidden;margin-top:14px}
-    .dmeter>i{display:block;height:100%;background:var(--seq-3);border-radius:0 4px 4px 0}
+    .dhero .big{font-size:58px;line-height:1;font-weight:700;color:var(--pink-ink);letter-spacing:-.02em}
+    .dhero .sub{font-size:14px;color:var(--ink-2)}
+    .dmeter{height:12px;border-radius:999px;background:var(--surface-2);overflow:hidden;margin-top:16px}
+    .dmeter>i{display:block;height:100%;background:var(--pink-2);border-radius:0 4px 4px 0}
 
-    .dtile .lbl{font-size:12px;color:var(--d-ink2)}
-    .dtile .val{font-size:28px;font-weight:600;margin-top:4px}
-    .dtile .note{font-size:12px;color:var(--d-muted);margin-top:2px}
+    .dtile .lbl{font-size:12px;color:var(--ink-2)}
+    .dtile .val{font-size:30px;font-weight:700;margin-top:5px;letter-spacing:-.01em}
+    .dtile .note{font-size:11.5px;color:var(--ink-3);margin-top:3px}
 
     /* 地域別メーター行 */
     .drow{display:grid;grid-template-columns:88px 1fr auto;gap:10px;align-items:center;padding:5px 0}
-    .drow .nm{font-size:13px;color:var(--d-ink2);white-space:nowrap}
-    .drow .track{height:14px;border-radius:999px;background:rgba(34,211,238,.14)}
-    .drow .track>i{display:block;height:100%;background:var(--seq-3);border-radius:0 4px 4px 0}
-    .drow .vl{font-size:12px;color:var(--d-ink2);font-variant-numeric:tabular-nums;white-space:nowrap}
+    .drow .nm{font-size:13px;color:var(--ink-2);white-space:nowrap}
+    .drow .track{height:12px;border-radius:999px;background:var(--surface-2)}
+    .drow .track>i{display:block;height:100%;background:var(--pink-2);border-radius:0 4px 4px 0}
+    .drow .vl{font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
 
     /* エリアタイル（ヒートマップ） */
-    .dregion{margin-bottom:14px}
-    .dregion>.rt{font-size:12px;color:var(--d-muted);margin-bottom:6px}
+    .dregion{margin-bottom:15px}
+    .dregion>.rt{font-size:11.5px;font-weight:700;color:var(--ink-3);margin-bottom:7px}
     .dtiles{display:flex;flex-wrap:wrap;gap:6px}
     .dtile2{
-      min-width:78px;padding:7px 9px;border-radius:8px;background:var(--seq-0);
+      min-width:80px;padding:7px 9px;border-radius:var(--r-xs);background:var(--seq-0);
       border:1px solid transparent;cursor:default;
     }
-    .dtile2 .p{font-size:12px;font-weight:600;line-height:1.3}
-    .dtile2 .c{font-size:11px;opacity:.85;font-variant-numeric:tabular-nums}
-    .dtile2.z{border-color:var(--d-line);color:var(--d-muted)}
-    .dscale{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;font-size:11px;color:var(--d-muted)}
+    .dtile2 .p{font-size:12px;font-weight:700;line-height:1.3}
+    .dtile2 .c{font-size:11px;opacity:.9;font-variant-numeric:tabular-nums}
+    .dtile2.z{border-color:var(--line-2);color:var(--ink-3)}
+    .dscale{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:12px;font-size:11px;color:var(--ink-3)}
     .dscale span.sw{display:inline-block;width:16px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:4px}
 
     /* 推移グラフ。狭い画面では縮小して軸の文字が潰れるので、
@@ -122,16 +264,16 @@
     /* 長い表も同様にカード内でスクロールさせ、ページ自体は横に伸ばさない */
     .dscroll{overflow-x:auto}
     .dtip{
-      position:absolute;pointer-events:none;background:var(--d-plane);border:1px solid var(--d-line);
-      border-radius:8px;padding:6px 9px;font-size:12px;white-space:nowrap;opacity:0;transition:opacity .1s;
-      box-shadow:0 4px 14px rgba(0,0,0,.4);z-index:2;
+      position:absolute;pointer-events:none;background:var(--ink);color:#fff;border:none;
+      border-radius:var(--r-xs);padding:7px 10px;font-size:12px;white-space:nowrap;opacity:0;transition:opacity .1s;
+      box-shadow:var(--sh-2);z-index:2;
     }
-    .dempty{color:var(--d-muted);font-size:13px;padding:18px 0;text-align:center}
+    .dempty{color:var(--ink-3);font-size:13px;padding:22px 0;text-align:center;line-height:1.8}
 
     /* 表ビュー（アクセシビリティ用の同等表現） */
     .dtable{width:100%;border-collapse:collapse;font-size:13px}
-    .dtable th,.dtable td{padding:6px 8px;border-bottom:1px solid var(--d-grid);text-align:left}
-    .dtable thead th{color:var(--d-ink2);font-weight:600}
+    .dtable th,.dtable td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left}
+    .dtable thead th{color:var(--ink-3);font-weight:700;font-size:12px}
     .dtable td.n{text-align:right;font-variant-numeric:tabular-nums}
     @media print{
       #dashControls{display:none!important}
@@ -140,35 +282,75 @@
   </style>
 </head>
 <body>
-<header class="wrap">
-  <h1>ちいかわ ご当地キーホルダー 所持チェック</h1>
-  <div id="stats" class="small"></div>
-  <div id="newsBar"></div>
+<header class="topbar">
+  <div class="wrap">
+    <div class="brandrow">
+      <h1><small>ご当地ちいかわ</small><span class="t-long">キーホルダー </span>コレクション</h1>
+      <button id="btnDash" class="btn accent">ダッシュボード</button>
+      <button id="btnSettings" class="icon-btn" aria-label="設定と同期" title="設定と同期">⚙</button>
+    </div>
 
-  <div class="wrap row" style="margin-bottom:6px">
-    <button id="btnDash">📊 ダッシュボード</button>
-    <button id="btnPrint">一覧を表示/印刷</button>
-    <button id="btnCSVAll">CSV (全件)</button>
-    <span class="small" style="opacity:.85">地域→都道府県→名称で出力</span>
-  </div>
+    <!-- 進捗（この画面の主役） -->
+    <div class="phero">
+      <div class="nums"><b id="hOwned">0</b><span id="hTotal"> / 0</span></div>
+      <div class="bar"><i id="hBar" style="width:0%"></i></div>
+      <div class="pct" id="hPct">0%</div>
+    </div>
 
-  <!-- 認証UI -->
-  <div class="wrap row" id="authRow">
-    <button id="loginBtn" class="ghost">Googleでログイン</button>
-    <button id="logoutBtn" class="ghost hide">ログアウト</button>
-    <span id="userInfo" class="small"></span>
-  </div>
+    <div id="newsBar"></div>
 
-  <!-- 家族コード＋同期UI -->
-  <div class="wrap row" style="margin-top:6px">
-    <input id="familyCode" placeholder="家族コード（例: my-family）" style="min-width:220px">
-    <button id="connectBtn" class="ghost">同期オン</button>
-    <button id="disconnectBtn" class="ghost">同期オフ</button>
-    <span id="syncStatus" class="small">未接続</span>
+    <!-- 検索と絞り込み -->
+    <div class="toolbar">
+      <div class="search">
+        <span class="mag">🔍</span>
+        <input id="q" type="search" placeholder="名前や都道府県で探す" autocomplete="off">
+        <button id="qClear" class="clr hide" aria-label="検索をクリア">✕</button>
+      </div>
+      <div class="seg" id="filterSeg" role="group" aria-label="表示の絞り込み">
+        <button data-f="all"  aria-pressed="true">すべて</button>
+        <button data-f="todo" aria-pressed="false">未所持</button>
+        <button data-f="own"  aria-pressed="false">所持</button>
+      </div>
+    </div>
   </div>
 </header>
 
 <main class="wrap" id="app"></main>
+
+<!-- 設定と同期（普段は使わないものはここへ隠す） -->
+<div class="sheet" id="settings">
+  <div class="panel">
+    <div class="brandrow" style="padding-top:0">
+      <h1 style="font-size:16px">設定と同期</h1>
+      <button id="setClose" class="icon-btn" aria-label="閉じる">✕</button>
+    </div>
+
+    <div class="sec">
+      <h3>家族で共有する</h3>
+      <p>Google でログインして家族コードを合わせると、同じチェックリストを共有できます。</p>
+      <div class="stack" style="margin-bottom:8px">
+        <button id="loginBtn" class="btn ghost">Googleでログイン</button>
+        <button id="logoutBtn" class="btn ghost hide">ログアウト</button>
+        <span id="userInfo" class="small"></span>
+      </div>
+      <div class="stack">
+        <input id="familyCode" placeholder="家族コード（例: my-family）">
+        <button id="connectBtn" class="btn ghost sm">同期オン</button>
+        <button id="disconnectBtn" class="btn ghost sm">同期オフ</button>
+      </div>
+      <p style="margin-top:8px"><span id="syncStatus" class="small">未接続</span></p>
+    </div>
+
+    <div class="sec">
+      <h3>書き出す</h3>
+      <p>地域 → 都道府県 → 名称の順で出力します。</p>
+      <div class="stack">
+        <button id="btnPrint" class="btn ghost sm">一覧を表示 / 印刷</button>
+        <button id="btnCSVAll" class="btn ghost sm">CSV（全件）</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Firebase SDK を ES Modules で読み込み（v10系） -->
 <script type="module">
@@ -780,7 +962,10 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     return 1;
   }
   // 段ごとの文字色。明るい段の上では濃いインクにしてコントラストを確保する
-  const SEQ_INK = ['var(--d-muted)','#e5e7eb','#e5e7eb','#062a35','#062a35'];
+  // 段ごとの背景と文字色。文字色は各段に対して 4.5:1 以上を確保した組み合わせ
+  // （#f6f2ec 15.3 / #f48ebd 7.7 / #e85d9d 5.3 は濃いインク、#c93b7c 4.8 / #9c1f5b 7.6 は白）
+  const SEQ_BG  = ['var(--seq-0)','var(--pink-1)','var(--pink-2)','var(--pink-3)','var(--pink-4)'];
+  const SEQ_INK = ['var(--ink)','var(--ink)','var(--ink)','#ffffff','#ffffff'];
 
   function pct(n, d){ return d ? Math.round(n/d*100) : 0; }
   const esc2 = (s) => String(s ?? '')
@@ -807,8 +992,8 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     for(let v=0; v<=yMax; v+=step) ticks.push(v);
 
     const grid = ticks.map(v =>
-      `<line x1="${mL}" y1="${Y(v).toFixed(1)}" x2="${mL+pw}" y2="${Y(v).toFixed(1)}" stroke="var(--d-grid)" stroke-width="1"/>
-       <text x="${mL-8}" y="${(Y(v)+4).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--d-muted)" style="font-variant-numeric:tabular-nums">${v}</text>`
+      `<line x1="${mL}" y1="${Y(v).toFixed(1)}" x2="${mL+pw}" y2="${Y(v).toFixed(1)}" stroke="var(--line)" stroke-width="1"/>
+       <text x="${mL-8}" y="${(Y(v)+4).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--ink-3)" style="font-variant-numeric:tabular-nums">${v}</text>`
     ).join('');
 
     const pts = timeline.map((d,i) => `${X(i).toFixed(1)},${Y(d.cum).toFixed(1)}`);
@@ -822,7 +1007,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
       if(last_i - i >= Math.max(1, Math.ceil(everyI/2))) labelIdx.add(i);
     }
     const xlabs = [...labelIdx].sort((a,b)=>a-b).map(i =>
-      `<text x="${X(i).toFixed(1)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--d-muted)">${timeline[i].month.replace('-','/')}</text>`
+      `<text x="${X(i).toFixed(1)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--ink-3)">${timeline[i].month.replace('-','/')}</text>`
     ).join('');
 
     // ホバー用の当たり判定（マークより広く取る）
@@ -835,14 +1020,14 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     return `
       <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="所持数の累積推移">
         ${grid}
-        <path d="${area}" fill="var(--seq-3)" fill-opacity="0.10"/>
-        <polyline points="${pts.join(' ')}" fill="none" stroke="var(--seq-3)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-        <line class="dcross" x1="0" y1="${mT}" x2="0" y2="${mT+ph}" stroke="var(--d-line)" stroke-width="1" opacity="0"/>
-        <circle class="dfocus" r="5" fill="var(--seq-3)" stroke="var(--d-surface)" stroke-width="2" opacity="0"/>
-        <circle cx="${X(timeline.length-1).toFixed(1)}" cy="${Y(last.cum).toFixed(1)}" r="5" fill="var(--seq-3)" stroke="var(--d-surface)" stroke-width="2"/>
-        <text x="${(X(timeline.length-1)+10).toFixed(1)}" y="${(Y(last.cum)+4).toFixed(1)}" font-size="12" fill="var(--d-ink)" style="font-variant-numeric:tabular-nums">${last.cum}個</text>
+        <path d="${area}" fill="var(--pink-2)" fill-opacity="0.10"/>
+        <polyline points="${pts.join(' ')}" fill="none" stroke="var(--pink-2)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <line class="dcross" x1="0" y1="${mT}" x2="0" y2="${mT+ph}" stroke="var(--line-2)" stroke-width="1" opacity="0"/>
+        <circle class="dfocus" r="5" fill="var(--pink-2)" stroke="var(--surface)" stroke-width="2" opacity="0"/>
+        <circle cx="${X(timeline.length-1).toFixed(1)}" cy="${Y(last.cum).toFixed(1)}" r="5" fill="var(--pink-2)" stroke="var(--surface)" stroke-width="2"/>
+        <text x="${(X(timeline.length-1)+10).toFixed(1)}" y="${(Y(last.cum)+4).toFixed(1)}" font-size="12" fill="var(--ink)" style="font-variant-numeric:tabular-nums">${last.cum}個</text>
         ${xlabs}
-        <line x1="${mL}" y1="${mT+ph}" x2="${mL+pw}" y2="${mT+ph}" stroke="var(--d-line)" stroke-width="1"/>
+        <line x1="${mL}" y1="${mT+ph}" x2="${mL+pw}" y2="${mT+ph}" stroke="var(--line-2)" stroke-width="1"/>
         ${hit}
       </svg>`;
   }
@@ -878,7 +1063,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
             const tip = ar.owned === ar.total
               ? 'コンプリート'
               : '未所持: ' + (ar.missing.slice(0,6).join('、') + (ar.missing.length>6 ? ' ほか' : ''));
-            return `<div class="dtile2${s===0?' z':''}" style="background:var(--seq-${s});color:${SEQ_INK[s]}"
+            return `<div class="dtile2${s===0?' z':''}" style="background:${SEQ_BG[s]};color:${SEQ_INK[s]}"
                       title="${esc2(ar.pref)} ${ar.owned}/${ar.total}｜${esc2(tip)}">
               <div class="p">${esc2(ar.pref)}</div>
               <div class="c">${ar.owned}/${ar.total}</div>
@@ -888,11 +1073,11 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
       </div>`).join('');
 
     const scale = `<div class="dscale">
-      <span><span class="sw" style="background:var(--seq-0);outline:1px solid var(--d-line)"></span>0%</span>
-      <span><span class="sw" style="background:var(--seq-1)"></span>〜33%</span>
-      <span><span class="sw" style="background:var(--seq-2)"></span>〜66%</span>
-      <span><span class="sw" style="background:var(--seq-3)"></span>〜99%</span>
-      <span><span class="sw" style="background:var(--seq-4)"></span>100%</span>
+      <span><span class="sw" style="background:${SEQ_BG[0]};outline:1px solid var(--line-2)"></span>0%</span>
+      <span><span class="sw" style="background:${SEQ_BG[1]}"></span>〜33%</span>
+      <span><span class="sw" style="background:${SEQ_BG[2]}"></span>〜66%</span>
+      <span><span class="sw" style="background:${SEQ_BG[3]}"></span>〜99%</span>
+      <span><span class="sw" style="background:${SEQ_BG[4]}"></span>100%</span>
       <span style="margin-left:4px">※タイル内の数字でも読めます</span>
     </div>`;
 
@@ -902,7 +1087,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
           <td class="n">${n.owned}/${n.total}</td>
           <td>${esc2(n.missing.join('、'))}</td>
         </tr>`).join('')
-      : `<tr><td colspan="3" style="color:var(--d-muted)">残り2個以内のエリアはありません。</td></tr>`;
+      : `<tr><td colspan="3" style="color:var(--ink-3)">残り2個以内のエリアはありません。</td></tr>`;
 
     const tableRows = a.allAreas.map(ar => `<tr>
         <td>${esc2(ar.region)}</td><td>${esc2(ar.pref)}</td>
@@ -910,15 +1095,15 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
       </tr>`).join('');
 
     const undatedNote = a.undatedOwned
-      ? `<div class="note" style="margin-top:8px;color:var(--d-muted);font-size:12px">
+      ? `<div class="note" style="margin-top:8px;color:var(--ink-3);font-size:12px">
            所持日が未記録の${a.undatedOwned}個はグラフに含まれていません（合計には入っています）。</div>`
       : '';
 
     return `
       <div class="dwrap">
         <div class="row" id="dashControls" style="justify-content:flex-end;margin-bottom:8px">
-          <button id="dToggleTable" class="ghost">表で見る</button>
-          <button id="dClose" class="ghost">閉じる</button>
+          <button id="dToggleTable" class="btn ghost sm">表で見る</button>
+          <button id="dClose" class="btn ghost sm">閉じる</button>
         </div>
 
         <h2 style="margin-bottom:12px">収集ダッシュボード</h2>
@@ -1039,16 +1224,70 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
 
   // 該当行までスクロールして、その地域を開いた上で一瞬光らせる
   function jumpToItem(key){
-    const tr = app.querySelector(`tr[data-key="${CSS.escape(key)}"]`);
-    if(!tr) return;
-    const det = tr.closest('details.region');
-    if(det && !det.open) det.open = true;
-    tr.scrollIntoView({ behavior:'smooth', block:'center' });
-    const prev = tr.style.background;
-    tr.style.transition = 'background .3s';
-    tr.style.background = 'rgba(34,211,238,.22)';
-    setTimeout(() => { tr.style.background = prev; }, 1600);
+    // 絞り込みで隠れている可能性があるので、まず「すべて」に戻して検索も解除する
+    let el = app.querySelector(`.tile[data-key="${CSS.escape(key)}"]`);
+    if(!el){
+      view.q = ''; view.filter = 'all';
+      document.getElementById('q').value = '';
+      document.getElementById('qClear').classList.add('hide');
+      syncFilterButtons();
+      render();
+      el = app.querySelector(`.tile[data-key="${CSS.escape(key)}"]`);
+    }
+    if(!el) return;
+    el.scrollIntoView({ behavior:'smooth', block:'center' });
+    el.style.transition = 'box-shadow .25s, outline-color .25s';
+    el.style.outline = '3px solid var(--pink-2)';
+    el.style.outlineOffset = '2px';
+    setTimeout(() => { el.style.outline = ''; el.style.outlineOffset = ''; }, 1800);
   }
+
+  /* ===== 検索・絞り込み・設定シートの配線 ===== */
+  const qInput = document.getElementById('q');
+  const qClear = document.getElementById('qClear');
+  const filterSeg = document.getElementById('filterSeg');
+
+  function syncFilterButtons(){
+    filterSeg.querySelectorAll('button').forEach(b =>
+      b.setAttribute('aria-pressed', String(b.dataset.f === view.filter)));
+  }
+
+  let qTimer = null;
+  qInput.addEventListener('input', () => {
+    qClear.classList.toggle('hide', !qInput.value);
+    // 入力ごとに149件を組み直すと重いので少し待つ
+    clearTimeout(qTimer);
+    qTimer = setTimeout(() => {
+      view.q = qInput.value.trim().toLowerCase();
+      render();
+    }, 140);
+  });
+  qClear.addEventListener('click', () => {
+    qInput.value = ''; view.q = '';
+    qClear.classList.add('hide');
+    render(); qInput.focus();
+  });
+  filterSeg.addEventListener('click', (ev) => {
+    const b = ev.target.closest('button[data-f]');
+    if(!b) return;
+    view.filter = b.dataset.f;
+    syncFilterButtons();
+    render();
+  });
+
+  const sheet = document.getElementById('settings');
+  const openSheet = () => { sheet.classList.add('open'); document.body.classList.add('locked'); };
+  const closeSheet = () => { sheet.classList.remove('open'); document.body.classList.remove('locked'); };
+  document.getElementById('btnSettings').addEventListener('click', openSheet);
+  document.getElementById('setClose').addEventListener('click', closeSheet);
+  // 背景をクリックしたら閉じる（パネル内のクリックは通す）
+  sheet.addEventListener('click', (ev) => { if(ev.target === sheet) closeSheet(); });
+  document.addEventListener('keydown', (ev) => {
+    if(ev.key !== 'Escape') return;
+    if(sheet.classList.contains('open')) closeSheet();
+    const dash = document.getElementById('dashOverlay');
+    if(dash && dash.style.display === 'block'){ dash.style.display='none'; dash.innerHTML=''; }
+  });
 
   function renderNews(){
     const bar = document.getElementById('newsBar');
@@ -1081,7 +1320,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
         <div class="lst"></div>
       </div>
       <div class="act">
-        <button class="ghost" data-act="ok">確認した</button>
+        <button class="btn ghost sm" data-act="ok">確認した</button>
       </div>`;
 
     // 名前はボタンにして、その商品の行へ飛べるようにする
@@ -1105,111 +1344,192 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     bar.appendChild(box);
   }
 
-  /* ===== 画面描画（2カラム） ===== */
-  const regionSummaryEl = new Map();
+  /* ===== 画面描画（図鑑グリッド） ===== */
+
+  // 検索と絞り込みの状態
+  const view = { q:'', filter:'all' };
 
   function updateStats(){
-    const ownTotal=items.filter(x=>x.owned).length;
-    document.getElementById('stats').textContent =
-      `${ownTotal}/${items.length} 所持 (${items.length?Math.round(ownTotal/items.length*100):0}%)`;
+    const own = items.filter(x=>x.owned).length;
+    const pc = items.length ? Math.round(own/items.length*100) : 0;
+    document.getElementById('hOwned').textContent = own;
+    document.getElementById('hTotal').textContent = ` / ${items.length}`;
+    document.getElementById('hBar').style.width = pc + '%';
+    document.getElementById('hPct').textContent = pc + '%';
+  }
+
+  // 検索は名称・都道府県・地域のどれかに当たれば拾う
+  function matchesView(it){
+    if(view.filter === 'own'  && !it.owned) return false;
+    if(view.filter === 'todo' &&  it.owned) return false;
+    if(!view.q) return true;
+    const q = view.q;
+    return (it.name||'').toLowerCase().includes(q)
+        || (it.pref||'').toLowerCase().includes(q)
+        || (it.region||'').toLowerCase().includes(q);
+  }
+
+  // 所持日の表示は短く（2026-07-30 → 26/7/30）
+  function shortDate(s){
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s||'');
+    return m ? `${m[1].slice(2)}/${Number(m[2])}/${Number(m[3])}` : '';
+  }
+
+  // 1枚のタイルを組み立てる。クリックで所持を切り替え、日付部分だけは別扱い。
+  function buildTile(it){
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = 'tile' + (it.owned ? ' owned' : '');
+    tile.dataset.key = normalizedKey(it.region, it.pref, it.name);
+    tile.setAttribute('aria-pressed', String(!!it.owned));
+    tile.title = `${it.pref} ${it.name}`;
+
+    const thumb = document.createElement('span');
+    thumb.className = 'thumb';
+    thumb.textContent = '🧸';   // 商品画像を入れるまでの仮置き
+
+    const nm = document.createElement('span');
+    nm.className = 'tname';
+    nm.textContent = it.name;
+
+    const dt = document.createElement('span');
+    dt.className = 'tdate';
+
+    // 日付部分：所持済みなら押して編集できる
+    const paintDate = () => {
+      dt.textContent = it.owned ? (shortDate(it.ownedAt) || '日付なし') : '';
+    };
+    paintDate();
+
+    dt.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      if(!it.owned) return;
+      if(dt.querySelector('input')) return;
+
+      const inp = document.createElement('input');
+      inp.type = 'date';
+      inp.className = 'dateedit';
+      inp.value = it.ownedAt || today();
+      inp.max = today();
+      dt.textContent = '';
+      dt.appendChild(inp);
+      inp.focus();
+      if(inp.showPicker) { try{ inp.showPicker(); }catch{} }
+
+      const commit = () => {
+        if(inp.value) it.ownedAt = inp.value;
+        paintDate();
+        persist();
+      };
+      inp.addEventListener('click', e => e.stopPropagation());
+      inp.addEventListener('change', commit);
+      inp.addEventListener('blur', commit);
+      inp.addEventListener('keydown', e => {
+        if(e.key === 'Enter'){ e.preventDefault(); inp.blur(); }
+        if(e.key === 'Escape'){ e.preventDefault(); paintDate(); }
+      });
+    });
+
+    const chk = document.createElement('span');
+    chk.className = 'chk';
+    chk.textContent = '✓';
+    chk.setAttribute('aria-hidden', 'true');
+
+    tile.addEventListener('click', () => {
+      it.owned = !it.owned;
+      it.ownedAt = it.owned ? (it.ownedAt || today()) : null;
+      tile.classList.toggle('owned', it.owned);
+      tile.setAttribute('aria-pressed', String(it.owned));
+      paintDate();
+      updateStats();
+      repaintRegionBars();
+      persist();
+      // 絞り込み中は、条件から外れたタイルを引っ込める
+      if(!matchesView(it)) render();
+    });
+
+    tile.append(thumb, nm, dt, chk);
+    return tile;
+  }
+
+  function persist(){
+    try { save(); }
+    catch(e){ console.error('save() failed', e); setStatus('保存に失敗（コンソール参照）','warn'); }
+  }
+
+  // 地域ヘッダの進捗だけを描き直す（全体を作り直さずに済ませる）
+  function repaintRegionBars(){
+    app.querySelectorAll('.region').forEach(sec => {
+      const r = sec.dataset.region;
+      const all = items.filter(x => migrateRegion(x.region) === r);
+      const own = all.filter(x => x.owned).length;
+      const pc = all.length ? Math.round(own/all.length*100) : 0;
+      sec.querySelector('.rhead .bar > i').style.width = pc + '%';
+      const cnt = sec.querySelector('.rhead .cnt');
+      cnt.textContent = `${own}/${all.length}`;
+      cnt.classList.toggle('done', all.length > 0 && own === all.length);
+    });
   }
 
   function render(){
-    app.innerHTML='';
-    regionSummaryEl.clear();
+    app.innerHTML = '';
 
-    const regions=[...new Set(items.map(it=>migrateRegion(it.region)))]
-      .sort((a,b)=>(REGION_ORDER.indexOf(a)+1||999)-(REGION_ORDER.indexOf(b)+1||999)||a.localeCompare(b,'ja'));
+    const shown = items.filter(matchesView);
 
-    const frag=document.createDocumentFragment();
+    if(!shown.length){
+      const e = document.createElement('div');
+      e.className = 'emptystate';
+      e.textContent = view.q
+        ? `「${view.q}」に一致するキーホルダーはありません。`
+        : (view.filter === 'todo' ? 'すべて集まりました！' : 'まだ1つも登録されていません。');
+      app.appendChild(e);
+      updateStats();
+      return;
+    }
+
+    const regions = [...new Set(shown.map(it => migrateRegion(it.region)))]
+      .sort((a,b) => (REGION_ORDER.indexOf(a)+1||999) - (REGION_ORDER.indexOf(b)+1||999) || a.localeCompare(b,'ja'));
+
+    const frag = document.createDocumentFragment();
 
     for(const r of regions){
-      const rItems=items.filter(it=>migrateRegion(it.region)===r);
-      const ownR=rItems.filter(x=>x.owned).length;
+      // 進捗バーは絞り込みに関係なく、その地域の全体に対する達成率を出す
+      const allR = items.filter(it => migrateRegion(it.region) === r);
+      const ownR = allR.filter(x => x.owned).length;
+      const pc = allR.length ? Math.round(ownR/allR.length*100) : 0;
 
-      const details=document.createElement('details');
-      details.className='region';
-      details.open=(localStorage.getItem(LS_KEY+'_open_'+r)==='1');
+      const sec = document.createElement('section');
+      sec.className = 'region';
+      sec.dataset.region = r;
+      sec.innerHTML = `
+        <div class="rhead">
+          <h2>${esc2(r)}</h2>
+          <div class="bar"><i style="width:${pc}%"></i></div>
+          <span class="cnt${ownR === allR.length ? ' done' : ''}">${ownR}/${allR.length}</span>
+        </div>`;
 
-      const summary=document.createElement('summary');
-      summary.textContent=`${r} ${ownR}/${rItems.length}`;
-      details.appendChild(summary);
-      regionSummaryEl.set(r, summary);
-
-      const inner=document.createElement('div');
-      inner.className='inner';
-
-      const byPref={};
-      for(const it of rItems){
-        (byPref[it.pref]||(byPref[it.pref]=[])).push(it);
+      const byPref = new Map();
+      for(const it of shown.filter(it => migrateRegion(it.region) === r)){
+        if(!byPref.has(it.pref)) byPref.set(it.pref, []);
+        byPref.get(it.pref).push(it);
       }
-      const prefNames=Object.keys(byPref).sort((a,b)=>{
-        const ra=prefRank(a), rb=prefRank(b);
-        return (ra-rb) || a.localeCompare(b,'ja');
-      });
+      const prefs = [...byPref.keys()].sort((a,b) => (prefRank(a)-prefRank(b)) || a.localeCompare(b,'ja'));
 
-      const wrap=document.createElement('div'); wrap.className='tableWrap';
-      const table=document.createElement('table'); table.className='tbl';
-      const thead=document.createElement('thead'); const trh=document.createElement('tr');
-      ["都道府県","名称"].forEach(t=>{const th=document.createElement('th'); th.textContent=t; trh.appendChild(th);});
-      thead.appendChild(trh); table.appendChild(thead);
-
-      const tbody=document.createElement('tbody');
-      for(const p of prefNames){
-        const rows=byPref[p].sort((a,b)=>(a.name||'').localeCompare(b.name||'','ja'));
-        rows.forEach((it,idx)=>{
-          const tr=document.createElement('tr');
-          // 新着のお知らせから該当行へ飛べるようにキーを持たせる
-          tr.dataset.key = normalizedKey(it.region, it.pref, it.name);
-
-          const tdPref=document.createElement('td');
-          if(idx===0){ tdPref.textContent=p; tdPref.style.whiteSpace='nowrap'; } else { tdPref.textContent=''; }
-          tr.appendChild(tdPref);
-
-          const tdName=document.createElement('td');
-          const rowBox=document.createElement('div'); rowBox.className='row';
-
-          const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!!it.owned;
-          cb.addEventListener('click', (e)=> e.stopPropagation());
-          cb.addEventListener('change', (ev) => {
-            const checked = ev.currentTarget.checked;
-            it.owned = checked;
-            it.ownedAt = checked ? (it.ownedAt || today()) : null;
-
-            const ownedBadge = rowBox.querySelector('span.badge');
-            const dateSmall = rowBox.querySelector('span.small-muted');
-            ownedBadge.classList.toggle('yes', checked);
-            ownedBadge.textContent = checked ? '所持' : '未所持';
-            dateSmall.textContent = it.ownedAt ? `(${it.ownedAt})` : '';
-
-            const rNow = migrateRegion(it.region);
-            const rAll = items.filter(x=>migrateRegion(x.region)===rNow);
-            const rOwn = rAll.filter(x=>x.owned).length;
-            const sumEl = regionSummaryEl.get(rNow);
-            if(sumEl) sumEl.textContent = `${rNow} ${rOwn}/${rAll.length}`;
-
-            updateStats();
-
-            try { save(); } catch(e){ console.error('save() failed', e); setStatus('保存に失敗（コンソール参照）','warn'); }
-            ev.stopPropagation();
-          });
-
-          const nameSpan=document.createElement('span'); nameSpan.textContent=it.name;
-          const ownedBadge=document.createElement('span'); ownedBadge.className='badge'+(it.owned?' yes':''); ownedBadge.textContent=it.owned?'所持':'未所持';
-          const dateSmall=document.createElement('span'); dateSmall.className='small-muted'; dateSmall.textContent = it.ownedAt ? `(${it.ownedAt})` : '';
-
-          rowBox.append(cb, nameSpan, ownedBadge, dateSmall);
-          tdName.appendChild(rowBox);
-          tr.appendChild(tdName);
-
-          tbody.appendChild(tr);
-        });
+      for(const p of prefs){
+        const g = document.createElement('div');
+        g.className = 'pgroup';
+        const lb = document.createElement('div');
+        lb.className = 'plabel';
+        lb.textContent = p || '(未設定)';
+        const tiles = document.createElement('div');
+        tiles.className = 'tiles';
+        byPref.get(p)
+          .sort((a,b) => (a.name||'').localeCompare(b.name||'','ja'))
+          .forEach(it => tiles.appendChild(buildTile(it)));
+        g.append(lb, tiles);
+        sec.appendChild(g);
       }
-
-      table.appendChild(tbody); wrap.appendChild(table); inner.appendChild(wrap);
-      details.appendChild(inner);
-      details.addEventListener('toggle',()=>localStorage.setItem(LS_KEY+'_open_'+r,details.open?'1':'0'));
-      frag.appendChild(details);
+      frag.appendChild(sec);
     }
 
     app.appendChild(frag);
