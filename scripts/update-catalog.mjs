@@ -19,6 +19,8 @@ import { dirname, join } from 'node:path';
 import { fetchKakkon } from './sources/kakkon.mjs';
 import { fetchJpApi } from './sources/jpapi.mjs';
 import { normName } from './sources/fetch-util.mjs';
+// エリア・名称の解決は fetch-images.mjs と共有する（ずれると画像が別商品に付く）
+import { resolveAlias, keyOf, UNCLASSIFIED } from './resolve.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
@@ -43,9 +45,6 @@ const PREF_ORDER = [
   '福岡', '佐賀', '長崎', '熊本', '大分', '宮崎', '鹿児島', '沖縄',
 ];
 
-const UNCLASSIFIED = '未分類';
-
-const keyOf = (x) => `${x.region}__${x.pref}__${x.name}`;
 const regionRank = (r) => { const i = REGION_ORDER.indexOf(r); return i >= 0 ? i : 999; };
 const prefRank = (p) => { const i = PREF_ORDER.indexOf(p); return i >= 0 ? i : 999; };
 
@@ -55,27 +54,6 @@ function sortCatalog(list) {
     prefRank(a.pref) - prefRank(b.pref) ||
     a.pref.localeCompare(b.pref, 'ja') ||
     a.name.localeCompare(b.name, 'ja'));
-}
-
-/** name-map の照合。「名称@エリア」を優先し、無ければ「名称」で引く */
-function resolveAlias(aliases, name, area) {
-  const n = normName(name);
-  const candidates = area
-    ? [`${name}@${area}`, `${n}@${area}`, name, n]
-    : [name, n];
-  for (const c of candidates) {
-    if (Object.prototype.hasOwnProperty.call(aliases, c)) return aliases[c];
-  }
-  // キー側が未正規化で書かれている場合にも当たるよう、正規化同士でも突き合わせる
-  for (const [k, v] of Object.entries(aliases)) {
-    if (k.includes('@')) {
-      const [kn, ka] = k.split('@');
-      if (area && ka === area && normName(kn) === n) return v;
-    } else if (normName(k) === n) {
-      return v;
-    }
-  }
-  return name;
 }
 
 /** HTML から現行 FULL を読む。マーカーの有無どちらでも動く */

@@ -26,3 +26,6 @@ scripts/catalog-report.md
 # Env (もしAPIキーや秘密情報を置く場合)
 .env
 .env.local
+
+# 商品画像の取得時に出る一時ファイル
+public/images/items/*.orig

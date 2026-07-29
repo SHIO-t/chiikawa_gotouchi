@@ -27,6 +27,9 @@ const TYPES = {
   '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
   '.ico': 'image/x-icon',
 };
 
@@ -34,9 +37,13 @@ const handler = async (req, res) => {
   let rel = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (rel === '/') rel = '/chiikawa_checklist_claude.html';
 
+  // 商品画像は public/ 配下にしか置かない（デプロイ先と同じ配置にするため）。
+  // 編集中の HTML はリポジトリ直下にあるので、/images/ だけ public/ へ振り替える。
+  const base = rel.startsWith('/images/') ? join(ROOT, 'public') : ROOT;
+
   // ルート外へ出るパスは拒否する
-  const path = join(ROOT, normalize(rel).replace(/^(\.\.[/\\])+/, ''));
-  if (!path.startsWith(ROOT)) { res.writeHead(403).end('forbidden'); return; }
+  const path = join(base, normalize(rel).replace(/^(\.\.[/\\])+/, ''));
+  if (!path.startsWith(base)) { res.writeHead(403).end('forbidden'); return; }
 
   try {
     const body = await readFile(path);
