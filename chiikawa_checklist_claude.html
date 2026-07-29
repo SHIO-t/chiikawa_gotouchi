@@ -33,6 +33,29 @@
     .badge.yes{border-color:#065f46;color:#10b981;background:rgba(16,185,129,.08)}
     .small-muted{font-size:12px;color:#94a3b8;margin-left:8px}
 
+    /* ===== 新着のお知らせ ===== */
+    #newsBar:empty{display:none}
+    .news{
+      margin:10px 0 2px;padding:10px 12px;border-radius:10px;
+      background:rgba(34,211,238,.08);border:1px solid #164e63;
+      display:flex;gap:10px;align-items:flex-start;
+    }
+    .news .ic{font-size:16px;line-height:1.4}
+    .news .bd{flex:1;min-width:0}
+    .news .ttl{font-weight:700;font-size:14px;color:#67e8f9}
+    .news .lst{margin:5px 0 0;font-size:13px;color:#cbd5e1;line-height:1.7}
+    .news .lst button{
+      background:none;border:none;padding:0;margin:0 2px;color:#cbd5e1;
+      font:inherit;cursor:pointer;text-decoration:underline;text-underline-offset:2px;
+    }
+    .news .lst button:hover{color:#67e8f9}
+    .news .act{display:flex;gap:6px;flex-shrink:0}
+    .news .act button{margin:0;padding:5px 10px;font-size:12px}
+    @media(max-width:560px){
+      .news{flex-wrap:wrap}
+      .news .act{width:100%;justify-content:flex-end}
+    }
+
     /* ===== ダッシュボード =====
        配色は cyan 単色の順序ランプ（--seq-1〜4）。dataviz の ordinal チェック
        （単一色相・輝度単調・段差・最明段のコントラスト）を surface #0b1327 に対して
@@ -115,6 +138,7 @@
 <header class="wrap">
   <h1>ちいかわ ご当地キーホルダー 所持チェック</h1>
   <div id="stats" class="small"></div>
+  <div id="newsBar"></div>
 
   <div class="wrap row" style="margin-bottom:6px">
     <button id="btnDash">📊 ダッシュボード</button>
@@ -405,8 +429,40 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     return out;
   }
 
+  /* ===== 新着のお知らせ =====
+     この端末が「もう見た」カタログのキーを覚えておき、FULL との差を新着として出す。
+     所持データとは別管理なので、お知らせを閉じてもチェックには影響しない。 */
+  const SEEN_KEY = LS_KEY + '__seen';
+  function loadSeen(){
+    try{
+      const a = JSON.parse(localStorage.getItem(SEEN_KEY));
+      return Array.isArray(a) ? new Set(a) : null;
+    }catch{ return null }
+  }
+  function saveSeen(set){
+    try{ localStorage.setItem(SEEN_KEY, JSON.stringify([...set])); }
+    catch(e){ console.error('seen 保存に失敗', e); }
+  }
+
+  const savedRaw = load();
+
   // 初期ロード：正規化＋ホワイトリストでクリーン化してから、新カタログを合流
-  let items = mergeCatalog(sanitize(load() || FULL));
+  let items = mergeCatalog(sanitize(savedRaw || FULL));
+
+  // 新着の判定。初回起動時は全件が新着になってしまうので何も出さない。
+  // お知らせ機能を入れる前からの利用者は、保存済みデータを既知として扱う。
+  let newArrivals = [];
+  {
+    let seen = loadSeen();
+    if(!seen){
+      seen = savedRaw
+        ? new Set(sanitize(savedRaw).map(it => normalizedKey(it.region, it.pref, it.name)))
+        : new Set(FULL.map(x => normalizedKey(x.region, x.pref, x.name)));
+      saveSeen(seen);
+    }
+    newArrivals = FULL.filter(x => !seen.has(normalizedKey(x.region, x.pref, x.name)));
+  }
+
   // 以後の処理で使う前にローカルへ書き戻して正規化を確定させる
   function setStatus(t,cls=''){ syncStatus.textContent=t; syncStatus.className='small '+(cls||''); }
 
@@ -974,6 +1030,63 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
 
   document.getElementById('btnDash').addEventListener('click', openDashboard);
 
+  /* ===== 新着のお知らせの表示 ===== */
+
+  // 該当行までスクロールして、その地域を開いた上で一瞬光らせる
+  function jumpToItem(key){
+    const tr = app.querySelector(`tr[data-key="${CSS.escape(key)}"]`);
+    if(!tr) return;
+    const det = tr.closest('details.region');
+    if(det && !det.open) det.open = true;
+    tr.scrollIntoView({ behavior:'smooth', block:'center' });
+    const prev = tr.style.background;
+    tr.style.transition = 'background .3s';
+    tr.style.background = 'rgba(34,211,238,.22)';
+    setTimeout(() => { tr.style.background = prev; }, 1600);
+  }
+
+  function renderNews(){
+    const bar = document.getElementById('newsBar');
+    bar.innerHTML = '';
+    if(!newArrivals.length) return;
+
+    const SHOW = 8;
+    const shown = newArrivals.slice(0, SHOW);
+    const rest = newArrivals.length - shown.length;
+
+    const box = document.createElement('div');
+    box.className = 'news';
+    box.innerHTML = `
+      <div class="ic">🆕</div>
+      <div class="bd">
+        <div class="ttl">新しいキーホルダーが${newArrivals.length}件 追加されました</div>
+        <div class="lst"></div>
+      </div>
+      <div class="act">
+        <button class="ghost" data-act="ok">確認した</button>
+      </div>`;
+
+    // 名前はボタンにして、その商品の行へ飛べるようにする
+    const lst = box.querySelector('.lst');
+    shown.forEach((x, i) => {
+      if(i) lst.appendChild(document.createTextNode('・'));
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = `${x.pref ? x.pref + ' ' : ''}${x.name}`;
+      b.addEventListener('click', () => jumpToItem(normalizedKey(x.region, x.pref, x.name)));
+      lst.appendChild(b);
+    });
+    if(rest > 0) lst.appendChild(document.createTextNode(` ほか${rest}件`));
+
+    box.querySelector('[data-act="ok"]').addEventListener('click', () => {
+      saveSeen(new Set(FULL.map(x => normalizedKey(x.region, x.pref, x.name))));
+      newArrivals = [];
+      renderNews();
+    });
+
+    bar.appendChild(box);
+  }
+
   /* ===== 画面描画（2カラム） ===== */
   const regionSummaryEl = new Map();
 
@@ -1028,6 +1141,8 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
         const rows=byPref[p].sort((a,b)=>(a.name||'').localeCompare(b.name||'','ja'));
         rows.forEach((it,idx)=>{
           const tr=document.createElement('tr');
+          // 新着のお知らせから該当行へ飛べるようにキーを持たせる
+          tr.dataset.key = normalizedKey(it.region, it.pref, it.name);
 
           const tdPref=document.createElement('td');
           if(idx===0){ tdPref.textContent=p; tdPref.style.whiteSpace='nowrap'; } else { tdPref.textContent=''; }
@@ -1087,6 +1202,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
   const savedFamily = localStorage.getItem(FAMILY_KEY)||'';
   if(savedFamily) familyCodeInput.value = savedFamily;
   render();
+  renderNews();
 })(); // IIFE
 </script>
 </body>
