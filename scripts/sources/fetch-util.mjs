@@ -15,7 +15,18 @@ export const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 export async function fetchText(url, charset) {
   // jp-api.com の WAF は Accept / Accept-Language を付けると 406 を返すため、
   // 送るヘッダは User-Agent だけに留めること。
-  const res = await fetch(url, { headers: { 'User-Agent': UA } });
+  // 一時的な接続エラーは間隔を空けて3回まで試す（週次の自動実行が瞬断で落ちないように）
+  let res, lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      res = await fetch(url, { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(20000) });
+      break;
+    } catch (e) {
+      lastErr = e;
+      if (attempt < 3) await sleep(attempt * 2000);
+    }
+  }
+  if (!res) throw new Error(`${url} に接続できませんでした（3回試行）: ${lastErr?.cause?.code || lastErr?.message || lastErr}`);
   if (!res.ok) throw new Error(`${url} の取得に失敗しました (HTTP ${res.status})`);
   if (!charset) return await res.text();
   const buf = await res.arrayBuffer();

@@ -130,9 +130,17 @@ async function main() {
   const kakkonRows = await fetchKakkon();
   console.error(`  → ${kakkonRows.length} 件`);
 
+  // jp-api.com は裏取り専用なので、落ちていてもカタログ更新自体は続行する。
+  // 都道府県を含む本体のデータは kakkon.net 側に揃っている。
   console.error('jp-api.com を取得中…');
-  const jpapiRows = await fetchJpApi();
-  console.error(`  → ${jpapiRows.length} 件`);
+  let jpapiRows = [], jpapiError = null;
+  try {
+    jpapiRows = await fetchJpApi();
+    console.error(`  → ${jpapiRows.length} 件`);
+  } catch (e) {
+    jpapiError = e.message || String(e);
+    console.error(`  → 取得できませんでした（裏取りはスキップして続行します）: ${jpapiError}`);
+  }
 
   // jp-api 側の名称を kakkon の表記に寄せてから、正規化して裏取り用の集合にする
   const jpapiNames = new Map(); // normName(kakkon表記) -> types[]
@@ -183,7 +191,8 @@ async function main() {
 
   const added = catalog.filter(x => !currentKeys.has(keyOf(x)));
   const missing = current.filter(x => !catalogKeys.has(keyOf(x)));
-  const unconfirmed = catalog.filter(x => x._types === null);
+  // jp-api が取れなかった回は全件が「未確認」になってしまうので、裏取りの判定自体を伏せる
+  const unconfirmed = jpapiError ? [] : catalog.filter(x => x._types === null);
 
   // FULL からは削除しない。消えた候補もそのまま残す。
   const merged = [
@@ -197,8 +206,17 @@ async function main() {
   L.push('# ご当地ちいかわ カタログ差分レポート', '');
   L.push(`生成: ${now}`, '');
   L.push(`- kakkon.net: **${kakkonRows.length} 件**（エリア ${new Set(kakkonRows.map(r => r.area)).size} 種）`);
-  L.push(`- jp-api.com: **${jpapiRows.length} 件**（キーホルダー系のみ）`);
+  L.push(jpapiError
+    ? `- jp-api.com: **取得できず**（裏取りをスキップして続行しました）`
+    : `- jp-api.com: **${jpapiRows.length} 件**（キーホルダー系のみ）`);
   L.push(`- 現行 FULL: **${current.length} 件** → 更新後 **${merged.length} 件**`, '');
+
+  if (jpapiError) {
+    L.push('## ⚠️ 公式サイト（jp-api.com）を取得できませんでした', '');
+    L.push('```', jpapiError, '```', '');
+    L.push('都道府県を含む商品情報は kakkon.net 側に揃っているため、カタログの更新はそのまま行いました。');
+    L.push('ただし「その商品が公式の現行商品として載っているか」の裏取りは今回できていません。', '');
+  }
 
   if (unknownAreas.length) {
     L.push(`## ⚠️ area-map.json に無いエリア（${unknownAreas.length} 件）`, '');
@@ -212,22 +230,25 @@ async function main() {
   if (added.length) {
     L.push('| 地域 | 都道府県 | 名称 | kakkon 表記 | エリア | 公式(jp-api) |', '|---|---|---|---|---|---|');
     for (const x of added) {
-      L.push(`| ${x.region} | ${x.pref} | ${x.name} | ${x._srcName} | ${x._area} | ${x._types ? x._types.join(' / ') : '❓未掲載'} |`);
+      const official = jpapiError ? '—（取得できず）' : (x._types ? x._types.join(' / ') : '❓未掲載');
+      L.push(`| ${x.region} | ${x.pref} | ${x.name} | ${x._srcName} | ${x._area} | ${official} |`);
     }
   } else {
     L.push('なし。');
   }
   L.push('');
 
-  L.push(`## ℹ️ 公式サイト（jp-api.com）で確認できなかった商品（${unconfirmed.length} 件）`, '');
-  if (unconfirmed.length) {
-    L.push('kakkon.net には載っているが公式の商品一覧に見当たらないもの。掲載漏れの可能性が高いので**削除はしません**。', '');
-    L.push('| 地域 | 都道府県 | 名称 | kakkon 表記 |', '|---|---|---|---|');
-    for (const x of unconfirmed) L.push(`| ${x.region} | ${x.pref} | ${x.name} | ${x._srcName} |`);
-  } else {
-    L.push('なし。');
+  if (!jpapiError) {
+    L.push(`## ℹ️ 公式サイト（jp-api.com）で確認できなかった商品（${unconfirmed.length} 件）`, '');
+    if (unconfirmed.length) {
+      L.push('kakkon.net には載っているが公式の商品一覧に見当たらないもの。掲載漏れの可能性が高いので**削除はしません**。', '');
+      L.push('| 地域 | 都道府県 | 名称 | kakkon 表記 |', '|---|---|---|---|');
+      for (const x of unconfirmed) L.push(`| ${x.region} | ${x.pref} | ${x.name} | ${x._srcName} |`);
+    } else {
+      L.push('なし。');
+    }
+    L.push('');
   }
-  L.push('');
 
   L.push(`## 🔍 どちらのソースにも見当たらない既存項目（${missing.length} 件）`, '');
   if (missing.length) {
