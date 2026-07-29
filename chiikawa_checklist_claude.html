@@ -32,6 +32,83 @@
     .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-weight:700;font-size:12px;border:1px solid #2b3a5d;margin-left:8px}
     .badge.yes{border-color:#065f46;color:#10b981;background:rgba(16,185,129,.08)}
     .small-muted{font-size:12px;color:#94a3b8;margin-left:8px}
+
+    /* ===== ダッシュボード =====
+       配色は cyan 単色の順序ランプ（--seq-1〜4）。dataviz の ordinal チェック
+       （単一色相・輝度単調・段差・最明段のコントラスト）を surface #0b1327 に対して
+       通したものなので、段の値を勝手に変えないこと。
+       --seq-0 は「0件」専用でわざと背景に沈めてあり、必ず数値ラベルを併記する。 */
+    #dashOverlay{
+      position:fixed;inset:0;z-index:9998;display:none;overflow:auto;
+      background:#0b1225;color:#e5e7eb;
+      --d-surface:#0b1327; --d-plane:#0f172a;
+      --d-ink:#e5e7eb; --d-ink2:#94a3b8; --d-muted:#64748b;
+      --d-grid:#1f2937; --d-line:#2b3a5d;
+      --seq-0:#131c33; --seq-1:#0e7490; --seq-2:#0891b2; --seq-3:#22d3ee; --seq-4:#67e8f9;
+      --d-ok:#34d399;
+    }
+    #dashOverlay .dwrap{max-width:1100px;margin:0 auto;padding:16px 16px 48px}
+    #dashOverlay h2{margin:0;font-size:20px}
+    #dashOverlay h3{margin:0 0 12px;font-size:14px;font-weight:600;color:var(--d-ink2)}
+    .dcard{background:var(--d-surface);border:1px solid var(--d-grid);border-radius:12px;padding:16px;margin-bottom:12px}
+    .dgrid{display:grid;gap:12px}
+    .dgrid.k4{grid-template-columns:repeat(2,1fr)}
+    @media(min-width:720px){.dgrid.k4{grid-template-columns:repeat(4,1fr)}}
+
+    /* ヒーロー数値：sans のまま、大きい数字は比例数字（tabular にしない） */
+    .dhero{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px}
+    .dhero .big{font-size:56px;line-height:1;font-weight:600;color:var(--d-ink)}
+    .dhero .sub{font-size:14px;color:var(--d-ink2)}
+    .dmeter{height:14px;border-radius:999px;background:rgba(34,211,238,.14);overflow:hidden;margin-top:14px}
+    .dmeter>i{display:block;height:100%;background:var(--seq-3);border-radius:0 4px 4px 0}
+
+    .dtile .lbl{font-size:12px;color:var(--d-ink2)}
+    .dtile .val{font-size:28px;font-weight:600;margin-top:4px}
+    .dtile .note{font-size:12px;color:var(--d-muted);margin-top:2px}
+
+    /* 地域別メーター行 */
+    .drow{display:grid;grid-template-columns:88px 1fr auto;gap:10px;align-items:center;padding:5px 0}
+    .drow .nm{font-size:13px;color:var(--d-ink2);white-space:nowrap}
+    .drow .track{height:14px;border-radius:999px;background:rgba(34,211,238,.14)}
+    .drow .track>i{display:block;height:100%;background:var(--seq-3);border-radius:0 4px 4px 0}
+    .drow .vl{font-size:12px;color:var(--d-ink2);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+    /* エリアタイル（ヒートマップ） */
+    .dregion{margin-bottom:14px}
+    .dregion>.rt{font-size:12px;color:var(--d-muted);margin-bottom:6px}
+    .dtiles{display:flex;flex-wrap:wrap;gap:6px}
+    .dtile2{
+      min-width:78px;padding:7px 9px;border-radius:8px;background:var(--seq-0);
+      border:1px solid transparent;cursor:default;
+    }
+    .dtile2 .p{font-size:12px;font-weight:600;line-height:1.3}
+    .dtile2 .c{font-size:11px;opacity:.85;font-variant-numeric:tabular-nums}
+    .dtile2.z{border-color:var(--d-line);color:var(--d-muted)}
+    .dscale{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;font-size:11px;color:var(--d-muted)}
+    .dscale span.sw{display:inline-block;width:16px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:4px}
+
+    /* 推移グラフ。狭い画面では縮小して軸の文字が潰れるので、
+       カード内で横スクロールさせて可読サイズを保つ */
+    .dchart{position:relative;overflow-x:auto}
+    .dchart svg{display:block;width:100%;min-width:520px;height:auto}
+    /* 長い表も同様にカード内でスクロールさせ、ページ自体は横に伸ばさない */
+    .dscroll{overflow-x:auto}
+    .dtip{
+      position:absolute;pointer-events:none;background:var(--d-plane);border:1px solid var(--d-line);
+      border-radius:8px;padding:6px 9px;font-size:12px;white-space:nowrap;opacity:0;transition:opacity .1s;
+      box-shadow:0 4px 14px rgba(0,0,0,.4);z-index:2;
+    }
+    .dempty{color:var(--d-muted);font-size:13px;padding:18px 0;text-align:center}
+
+    /* 表ビュー（アクセシビリティ用の同等表現） */
+    .dtable{width:100%;border-collapse:collapse;font-size:13px}
+    .dtable th,.dtable td{padding:6px 8px;border-bottom:1px solid var(--d-grid);text-align:left}
+    .dtable thead th{color:var(--d-ink2);font-weight:600}
+    .dtable td.n{text-align:right;font-variant-numeric:tabular-nums}
+    @media print{
+      #dashControls{display:none!important}
+      #dashOverlay{position:static!important;overflow:visible!important}
+    }
   </style>
 </head>
 <body>
@@ -40,6 +117,7 @@
   <div id="stats" class="small"></div>
 
   <div class="wrap row" style="margin-bottom:6px">
+    <button id="btnDash">📊 ダッシュボード</button>
     <button id="btnPrint">一覧を表示/印刷</button>
     <button id="btnCSVAll">CSV (全件)</button>
     <span class="small" style="opacity:.85">地域→都道府県→名称で出力</span>
@@ -570,6 +648,331 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
   }
 
   document.getElementById('btnPrint').addEventListener('click', openPrintAll);
+
+  /* ===== ダッシュボード ===== */
+
+  // 集計。items から必要な数字を一度に出す
+  function dashAggregate(list){
+    const total = list.length;
+    const ownedItems = list.filter(x => x.owned);
+    const owned = ownedItems.length;
+
+    // 地域別
+    const regions = [...new Set(list.map(it => migrateRegion(it.region)))]
+      .sort((a,b) => (REGION_ORDER.indexOf(a)+1||999) - (REGION_ORDER.indexOf(b)+1||999) || a.localeCompare(b,'ja'))
+      .map(r => {
+        const rows = list.filter(it => migrateRegion(it.region) === r);
+        return { name:r, total:rows.length, owned:rows.filter(x=>x.owned).length };
+      });
+
+    // エリア（都道府県相当）別。地域ごとにまとめる
+    const areasByRegion = regions.map(r => {
+      const rows = list.filter(it => migrateRegion(it.region) === r.name);
+      const byPref = new Map();
+      for(const it of rows){
+        if(!byPref.has(it.pref)) byPref.set(it.pref, []);
+        byPref.get(it.pref).push(it);
+      }
+      const areas = [...byPref].map(([pref, rs]) => ({
+        pref: pref || '(未設定)',
+        total: rs.length,
+        owned: rs.filter(x=>x.owned).length,
+        missing: rs.filter(x=>!x.owned).map(x=>x.name)
+      })).sort((a,b) => (prefRank(a.pref)-prefRank(b.pref)) || a.pref.localeCompare(b.pref,'ja'));
+      return { region:r.name, areas };
+    });
+
+    const allAreas = areasByRegion.flatMap(g => g.areas.map(a => ({...a, region:g.region})));
+    const completeAreas = allAreas.filter(a => a.total > 0 && a.owned === a.total);
+
+    // あと少しでコンプリートのエリア（残り1〜2件）。多いほど手前に出す
+    const nearly = allAreas
+      .filter(a => a.owned > 0 && a.owned < a.total && (a.total - a.owned) <= 2)
+      .sort((a,b) => (a.total-a.owned) - (b.total-b.owned) || b.owned - a.owned);
+
+    // 獲得の推移（ownedAt を月単位で累積）
+    const dated = ownedItems.filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x.ownedAt || ''));
+    const undatedOwned = owned - dated.length;
+    const byMonth = new Map();
+    for(const x of dated){
+      const m = x.ownedAt.slice(0,7);
+      byMonth.set(m, (byMonth.get(m)||0) + 1);
+    }
+    const months = [...byMonth.keys()].sort();
+    let running = 0;
+    const timeline = months.map(m => ({ month:m, added:byMonth.get(m), cum:(running += byMonth.get(m)) }));
+
+    // 直近30日の獲得数
+    const cutoff = new Date(Date.now() - 30*86400000).toISOString().slice(0,10);
+    const last30 = dated.filter(x => x.ownedAt >= cutoff).length;
+
+    return { total, owned, regions, areasByRegion, allAreas, completeAreas, nearly, timeline, undatedOwned, last30 };
+  }
+
+  // 達成率 → 順序ランプの段。0件だけは背景に沈む段を使い、必ず数値を併記する
+  function seqStep(owned, total){
+    if(total === 0 || owned === 0) return 0;
+    const r = owned / total;
+    if(r >= 1) return 4;
+    if(r >= 2/3) return 3;
+    if(r >= 1/3) return 2;
+    return 1;
+  }
+  // 段ごとの文字色。明るい段の上では濃いインクにしてコントラストを確保する
+  const SEQ_INK = ['var(--d-muted)','#e5e7eb','#e5e7eb','#062a35','#062a35'];
+
+  function pct(n, d){ return d ? Math.round(n/d*100) : 0; }
+  const esc2 = (s) => String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+  // 累積の推移グラフ。単一系列なので凡例は置かず、終点だけ直接ラベルする
+  function renderTimeline(timeline, totalCount){
+    if(timeline.length < 2){
+      return `<div class="dempty">推移を描くにはデータが足りません。<br>
+        所持日が記録された月が2つ以上になると、ここに累積グラフが出ます。</div>`;
+    }
+    const W = 760, H = 220, mL = 44, mR = 56, mT = 14, mB = 28;
+    const pw = W - mL - mR, ph = H - mT - mB;
+
+    // Y軸は 0 起点でキリのいい上限に丸める
+    const maxCum = timeline[timeline.length-1].cum;
+    const step = maxCum <= 10 ? 2 : maxCum <= 30 ? 5 : maxCum <= 80 ? 10 : 25;
+    const yMax = Math.max(step, Math.ceil(maxCum/step)*step);
+    const X = i => mL + (timeline.length === 1 ? pw/2 : pw * i/(timeline.length-1));
+    const Y = v => mT + ph - ph * (v/yMax);
+
+    const ticks = [];
+    for(let v=0; v<=yMax; v+=step) ticks.push(v);
+
+    const grid = ticks.map(v =>
+      `<line x1="${mL}" y1="${Y(v).toFixed(1)}" x2="${mL+pw}" y2="${Y(v).toFixed(1)}" stroke="var(--d-grid)" stroke-width="1"/>
+       <text x="${mL-8}" y="${(Y(v)+4).toFixed(1)}" text-anchor="end" font-size="11" fill="var(--d-muted)" style="font-variant-numeric:tabular-nums">${v}</text>`
+    ).join('');
+
+    const pts = timeline.map((d,i) => `${X(i).toFixed(1)},${Y(d.cum).toFixed(1)}`);
+    const area = `M${mL},${(mT+ph).toFixed(1)} L${pts.join(' L')} L${X(timeline.length-1).toFixed(1)},${(mT+ph).toFixed(1)} Z`;
+
+    // X軸ラベルは最大6個。両端は必ず出し、末尾と近すぎる中間ラベルは落として重なりを防ぐ
+    const last_i = timeline.length - 1;
+    const everyI = Math.max(1, Math.round(last_i / 5));
+    const labelIdx = new Set([0, last_i]);
+    for(let i = everyI; i < last_i; i += everyI){
+      if(last_i - i >= Math.max(1, Math.ceil(everyI/2))) labelIdx.add(i);
+    }
+    const xlabs = [...labelIdx].sort((a,b)=>a-b).map(i =>
+      `<text x="${X(i).toFixed(1)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--d-muted)">${timeline[i].month.replace('-','/')}</text>`
+    ).join('');
+
+    // ホバー用の当たり判定（マークより広く取る）
+    const hit = timeline.map((d,i) => {
+      const bw = pw / timeline.length;
+      return `<rect class="dhit" data-i="${i}" x="${(X(i)-bw/2).toFixed(1)}" y="${mT}" width="${bw.toFixed(1)}" height="${ph}" fill="transparent"/>`;
+    }).join('');
+
+    const last = timeline[timeline.length-1];
+    return `
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="所持数の累積推移">
+        ${grid}
+        <path d="${area}" fill="var(--seq-3)" fill-opacity="0.10"/>
+        <polyline points="${pts.join(' ')}" fill="none" stroke="var(--seq-3)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        <line class="dcross" x1="0" y1="${mT}" x2="0" y2="${mT+ph}" stroke="var(--d-line)" stroke-width="1" opacity="0"/>
+        <circle class="dfocus" r="5" fill="var(--seq-3)" stroke="var(--d-surface)" stroke-width="2" opacity="0"/>
+        <circle cx="${X(timeline.length-1).toFixed(1)}" cy="${Y(last.cum).toFixed(1)}" r="5" fill="var(--seq-3)" stroke="var(--d-surface)" stroke-width="2"/>
+        <text x="${(X(timeline.length-1)+10).toFixed(1)}" y="${(Y(last.cum)+4).toFixed(1)}" font-size="12" fill="var(--d-ink)" style="font-variant-numeric:tabular-nums">${last.cum}個</text>
+        ${xlabs}
+        <line x1="${mL}" y1="${mT+ph}" x2="${mL+pw}" y2="${mT+ph}" stroke="var(--d-line)" stroke-width="1"/>
+        ${hit}
+      </svg>`;
+  }
+
+  function buildDashboard(){
+    const a = dashAggregate(items);
+    const rate = pct(a.owned, a.total);
+
+    const tiles = [
+      { lbl:'所持', val:a.owned, note:`全${a.total}個中` },
+      { lbl:'未所持', val:a.total - a.owned, note:'残り' },
+      { lbl:'コンプリート済みエリア', val:a.completeAreas.length, note:`全${a.allAreas.length}エリア中` },
+      { lbl:'直近30日の獲得', val:(a.last30 ? '+'+a.last30 : '0'), note:'所持日の記録から' },
+    ].map(t => `<div class="dcard dtile">
+        <div class="lbl">${t.lbl}</div>
+        <div class="val">${t.val}</div>
+        <div class="note">${esc2(t.note)}</div>
+      </div>`).join('');
+
+    const regionRows = a.regions.map(r => `
+      <div class="drow" title="${esc2(r.name)} ${r.owned}/${r.total}（${pct(r.owned,r.total)}%）">
+        <div class="nm">${esc2(r.name)}</div>
+        <div class="track"><i style="width:${pct(r.owned,r.total)}%"></i></div>
+        <div class="vl">${r.owned}/${r.total}・${pct(r.owned,r.total)}%</div>
+      </div>`).join('');
+
+    const heat = a.areasByRegion.map(g => `
+      <div class="dregion">
+        <div class="rt">${esc2(g.region)}</div>
+        <div class="dtiles">
+          ${g.areas.map(ar => {
+            const s = seqStep(ar.owned, ar.total);
+            const tip = ar.owned === ar.total
+              ? 'コンプリート'
+              : '未所持: ' + (ar.missing.slice(0,6).join('、') + (ar.missing.length>6 ? ' ほか' : ''));
+            return `<div class="dtile2${s===0?' z':''}" style="background:var(--seq-${s});color:${SEQ_INK[s]}"
+                      title="${esc2(ar.pref)} ${ar.owned}/${ar.total}｜${esc2(tip)}">
+              <div class="p">${esc2(ar.pref)}</div>
+              <div class="c">${ar.owned}/${ar.total}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`).join('');
+
+    const scale = `<div class="dscale">
+      <span><span class="sw" style="background:var(--seq-0);outline:1px solid var(--d-line)"></span>0%</span>
+      <span><span class="sw" style="background:var(--seq-1)"></span>〜33%</span>
+      <span><span class="sw" style="background:var(--seq-2)"></span>〜66%</span>
+      <span><span class="sw" style="background:var(--seq-3)"></span>〜99%</span>
+      <span><span class="sw" style="background:var(--seq-4)"></span>100%</span>
+      <span style="margin-left:4px">※タイル内の数字でも読めます</span>
+    </div>`;
+
+    const nearlyRows = a.nearly.length
+      ? a.nearly.slice(0,12).map(n => `<tr>
+          <td>${esc2(n.pref)}<span class="small-muted">${esc2(n.region)}</span></td>
+          <td class="n">${n.owned}/${n.total}</td>
+          <td>${esc2(n.missing.join('、'))}</td>
+        </tr>`).join('')
+      : `<tr><td colspan="3" style="color:var(--d-muted)">残り2個以内のエリアはありません。</td></tr>`;
+
+    const tableRows = a.allAreas.map(ar => `<tr>
+        <td>${esc2(ar.region)}</td><td>${esc2(ar.pref)}</td>
+        <td class="n">${ar.owned}</td><td class="n">${ar.total}</td><td class="n">${pct(ar.owned,ar.total)}%</td>
+      </tr>`).join('');
+
+    const undatedNote = a.undatedOwned
+      ? `<div class="note" style="margin-top:8px;color:var(--d-muted);font-size:12px">
+           所持日が未記録の${a.undatedOwned}個はグラフに含まれていません（合計には入っています）。</div>`
+      : '';
+
+    return `
+      <div class="dwrap">
+        <div class="row" id="dashControls" style="justify-content:flex-end;margin-bottom:8px">
+          <button id="dToggleTable" class="ghost">表で見る</button>
+          <button id="dClose" class="ghost">閉じる</button>
+        </div>
+
+        <h2 style="margin-bottom:12px">収集ダッシュボード</h2>
+
+        <div class="dcard">
+          <h3>全体の達成率</h3>
+          <div class="dhero">
+            <div class="big">${rate}%</div>
+            <div class="sub">${a.owned} / ${a.total} 個</div>
+          </div>
+          <div class="dmeter"><i style="width:${rate}%"></i></div>
+        </div>
+
+        <div class="dgrid k4">${tiles}</div>
+
+        <div class="dcard">
+          <h3>地域別の達成状況</h3>
+          ${regionRows}
+        </div>
+
+        <div class="dcard">
+          <h3>エリア別の収集状況</h3>
+          ${heat}
+          ${scale}
+        </div>
+
+        <div class="dcard">
+          <h3>所持数の推移（累積）</h3>
+          <div class="dchart">${renderTimeline(a.timeline, a.total)}<div class="dtip"></div></div>
+          ${undatedNote}
+        </div>
+
+        <div class="dcard">
+          <h3>あと少しでコンプリート</h3>
+          <div class="dscroll">
+            <table class="dtable">
+              <thead><tr><th>エリア</th><th class="n">所持</th><th>足りない商品</th></tr></thead>
+              <tbody>${nearlyRows}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="dcard hide" id="dTableView">
+          <h3>エリア別の数値（表）</h3>
+          <div class="dscroll">
+            <table class="dtable">
+              <thead><tr><th>地域</th><th>エリア</th><th class="n">所持</th><th class="n">全体</th><th class="n">達成率</th></tr></thead>
+              <tbody>${tableRows}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function openDashboard(){
+    let el = document.getElementById('dashOverlay');
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'dashOverlay';
+      document.body.appendChild(el);
+    }
+    el.innerHTML = buildDashboard();
+    el.style.display = 'block';
+    el.scrollTop = 0;
+
+    el.querySelector('#dClose').onclick = () => { el.style.display='none'; el.innerHTML=''; };
+    const tv = el.querySelector('#dTableView');
+    el.querySelector('#dToggleTable').onclick = (ev) => {
+      tv.classList.toggle('hide');
+      ev.currentTarget.textContent = tv.classList.contains('hide') ? '表で見る' : '表を隠す';
+      if(!tv.classList.contains('hide')) tv.scrollIntoView({behavior:'smooth', block:'start'});
+    };
+
+    // 推移グラフのホバー（クロスヘア＋ツールチップ）。値は表ビューでも読めるので補助扱い
+    const chart = el.querySelector('.dchart');
+    const svg = chart && chart.querySelector('svg');
+    if(svg){
+      const a = dashAggregate(items);
+      const tip = chart.querySelector('.dtip');
+      const cross = svg.querySelector('.dcross');
+      const focus = svg.querySelector('.dfocus');
+      const hits = [...svg.querySelectorAll('.dhit')];
+      const pts = [...svg.querySelectorAll('polyline')][0].getAttribute('points').split(' ').map(s=>s.split(',').map(Number));
+
+      const show = (i) => {
+        const [cx, cy] = pts[i];
+        const d = a.timeline[i];
+        cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); cross.setAttribute('opacity','1');
+        focus.setAttribute('cx', cx); focus.setAttribute('cy', cy); focus.setAttribute('opacity','1');
+        const sx = svg.getBoundingClientRect().width / svg.viewBox.baseVal.width;
+        tip.innerHTML = `<b>${d.month.replace('-','年')}月</b><br>累積 ${d.cum}個（+${d.added}）`;
+        tip.style.opacity = '1';
+        // 横スクロールする器なので、可視領域ではなく SVG 座標系の中で収める
+        const tw = tip.offsetWidth;
+        const maxLeft = svg.getBoundingClientRect().width - tw;
+        tip.style.left = Math.max(0, Math.min(maxLeft, cx*sx - tw/2)) + 'px';
+        tip.style.top = Math.max(0, cy*sx - tip.offsetHeight - 12) + 'px';
+      };
+      // 隠すときは位置も戻す。出しっぱなしの座標が器の幅を広げてしまうため
+      const hide = () => {
+        tip.style.opacity='0'; tip.style.left='0px'; tip.style.top='0px';
+        cross.setAttribute('opacity','0'); focus.setAttribute('opacity','0');
+      };
+      hits.forEach(h => {
+        const i = Number(h.dataset.i);
+        h.addEventListener('mouseenter', () => show(i));
+        h.addEventListener('focus', () => show(i));
+        h.setAttribute('tabindex','0');
+      });
+      svg.addEventListener('mouseleave', hide);
+      svg.addEventListener('blur', hide, true);
+    }
+  }
+
+  document.getElementById('btnDash').addEventListener('click', openDashboard);
 
   /* ===== 画面描画（2カラム） ===== */
   const regionSummaryEl = new Map();
