@@ -19,7 +19,7 @@ export const KEYHOLDER_TYPES = ['ダイカットキーホルダー', 'ぬいぐ�
 const ITEM_RE = /<p class="img_023 img"><a href="([^"]+)" class="lightbox" rel="item" title="([^"]*)"/g;
 const PAGE_RE = /\/contents\/NOD62\/PGE(\d+)\//g;
 
-/** @returns {Promise<{name:string,types:string[]}[]>} */
+/** @returns {Promise<{name:string,types:string[],img:string|null}[]>} */
 export async function fetchJpApi() {
   const first = await fetchText(BASE, CHARSET);
 
@@ -40,13 +40,17 @@ export async function fetchJpApi() {
   for (const html of pages) {
     for (const m of html.matchAll(ITEM_RE)) {
       totalItems++;
+      const href = m[1];
       const title = m[2].trim();
       const type = KEYHOLDER_TYPES.find(t => title.endsWith(t));
       if (!type) continue; // 靴下等はスキップ
       const name = title.slice(0, -type.length).replace(/[\s　]+$/, '').trim();
       if (!name) continue;
-      if (!byName.has(name)) byName.set(name, new Set());
-      byName.get(name).add(type);
+      if (!byName.has(name)) byName.set(name, { types: new Set(), imgs: {} });
+      const e = byName.get(name);
+      e.types.add(type);
+      // 商品画像も拾っておく（画像取得スクリプトが使う）
+      if (href && !e.imgs[type]) e.imgs[type] = new URL(href, BASE).href;
     }
   }
 
@@ -54,7 +58,12 @@ export async function fetchJpApi() {
     throw new Error('jp-api.com から1件も取得できませんでした。HTML構造が変わった可能性があります。');
   }
 
-  return [...byName].map(([name, types]) => ({ name, types: [...types] }));
+  // 画像はダイカットキーホルダーを優先する（キーホルダー本体の絵柄が見えるため）
+  return [...byName].map(([name, e]) => ({
+    name,
+    types: [...e.types],
+    img: e.imgs['ダイカットキーホルダー'] || e.imgs['ぬいぐるみキーチェーン'] || null,
+  }));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

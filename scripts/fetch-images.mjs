@@ -7,8 +7,13 @@
  *   npm run fetch-images -- --force   … 既にあるものも上書きする
  *   npm run fetch-images -- --dry-run … 何を落とすか出すだけ
  *
- * 取得元は kakkon.net の記事。公式メーカー（jp-api.com）に商品画像はあるが、
- * サイトが落ちている間は取得できないため、当面こちらを使う。
+ * 取得元は2つ。
+ *   1. jp-api.com（公式メーカー）… 基本はこちら。商品画像として本来の出どころ
+ *   2. kakkon.net（記事）        … 公式で拾えなかった商品の穴埋め
+ *
+ * jp-api は商品名が1つに潰れるため、「みかん」（静岡/和歌山/愛媛）のように
+ * 同名で複数の土地にある商品は公式画像を割り当てられない。そこはエリアを
+ * 持っている kakkon 側で埋める。
  *
  * 画像は macOS の sips で 240px に縮小して JPEG にする。原寸のままだと
  * リポジトリが重くなるうえ、タイルは 112px 程度しか使わないため。
@@ -22,7 +27,8 @@ import { dirname, join } from 'node:path';
 
 import { fetchText, sleep, stripTags, normName } from './sources/fetch-util.mjs';
 import { KAKKON_PAGES } from './sources/kakkon.mjs';
-import { loadMaps, resolveRow, keyOf, fileKey } from './resolve.mjs';
+import { fetchJpApi } from './sources/jpapi.mjs';
+import { loadMaps, resolveRow, resolveAlias, keyOf, fileKey } from './resolve.mjs';
 
 const run = promisify(execFile);
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -100,9 +106,6 @@ async function main(){
   const force = process.argv.includes('--force');
 
   const maps = await loadMaps();
-  console.error('kakkon.net から画像URLを収集中…');
-  const rows = await scrapeWithImages();
-  console.error(`  → ${rows.length} 件`);
 
   // 現行カタログのキー集合。カタログに無い商品の画像は落とさない
   const html = await readFile(APP_HTML, 'utf8');
@@ -113,14 +116,45 @@ async function main(){
   // 正規化キーからカタログの正式キーを引ける索引も持つ
   const byNorm = new Map(catalogEntries.map(e =>
     [`${e.region}__${e.pref}__${normName(e.name)}`, keyOf(e)]));
+  // 名称だけでカタログを引く索引。jp-api はエリアを持たないので使う
+  const byName = new Map();
+  for(const e of catalogEntries){
+    const n = normName(e.name);
+    if(!byName.has(n)) byName.set(n, []);
+    byName.get(n).push(keyOf(e));
+  }
 
-  await mkdir(OUT_DIR, { recursive: true });
+  // --- 取得候補を作る。公式（jp-api）を優先し、足りない分を kakkon で埋める ---
+  /** @type {Map<string,{url:string,src:string}>} */
+  const want = new Map();
+  const ambiguous = [];
 
-  const map = {};           // カタログキー → ファイル名
-  const skipped = [];       // カタログに無かったもの
-  const failed = [];
-  let got = 0, reused = 0;
+  console.error('jp-api.com（公式）から画像URLを収集中…');
+  let jpapi = [];
+  try{
+    jpapi = await fetchJpApi();
+    console.error(`  → ${jpapi.length} 件`);
+  }catch(e){
+    console.error(`  → 取得できませんでした（kakkon.net だけで進めます）: ${e.message}`);
+  }
+  for(const r of jpapi){
+    if(!r.img) continue;
+    // jp-api の表記 → kakkon の表記 → アプリの名称 の順に寄せる
+    const asKakkon = maps.jpapiToKakkon[r.name] ?? maps.jpapiToKakkon[normName(r.name)] ?? r.name;
+    const appName = resolveAlias(maps.aliases, asKakkon, null);
+    const keys = byName.get(normName(appName)) || [];
+    if(keys.length === 1){
+      want.set(keys[0], { url: r.img, src: '公式' });
+    }else if(keys.length > 1){
+      // 同名で複数の土地にある商品。公式画像はどの土地のものか分からないので kakkon に任せる
+      ambiguous.push(`${r.name}（${keys.length}件）`);
+    }
+  }
 
+  console.error('kakkon.net から不足分の画像URLを収集中…');
+  const rows = await scrapeWithImages();
+  console.error(`  → ${rows.length} 件`);
+  const skipped = [];
   for(const row of rows){
     const item = resolveRow(row, maps);
     let key = keyOf(item);
@@ -128,18 +162,31 @@ async function main(){
       key = byNorm.get(`${item.region}__${item.pref}__${normName(item.name)}`);
     }
     if(!key){ skipped.push(`${row.area} 「${row.name}」`); continue; }
-    if(map[key]) continue;  // 同じ商品が複数回出てきたら最初のものを使う
+    if(want.has(key)) continue;   // 公式が取れているものは触らない
+    want.set(key, { url: row.imgUrl, src: 'kakkon' });
+  }
 
+  await mkdir(OUT_DIR, { recursive: true });
+
+  const map = {};           // カタログキー → ファイル名
+  const failed = [];
+  const bySrc = { 公式: 0, kakkon: 0 };
+  let got = 0, reused = 0;
+
+  for(const [key, { url, src }] of want){
     const file = fileKey(key) + '.jpg';
     map[key] = file;
+    bySrc[src]++;
     const dest = join(OUT_DIR, file);
 
-    if(!force && await fileExists(dest)){ reused++; continue; }
+    // 出どころが変わったので、既存ファイルがあっても公式に入れ替える
+    const needFetch = force || src === '公式' || !(await fileExists(dest));
+    if(!needFetch){ reused++; continue; }
     if(dryRun){ got++; continue; }
 
     const tmp = dest + '.orig';
     try{
-      await download(row.imgUrl, tmp);
+      await download(url, tmp);
       const ok = await shrink(tmp, dest);
       if(!ok) await writeFile(dest, await readFile(tmp));
       await rm(tmp, { force: true });
@@ -148,7 +195,8 @@ async function main(){
     }catch(e){
       await rm(tmp, { force: true });
       delete map[key];
-      failed.push(`${row.name}: ${e.message}`);
+      bySrc[src]--;
+      failed.push(`${key.split('__').join(' / ')} [${src}]: ${e.message}`);
     }
     await sleep(250);
   }
@@ -161,7 +209,11 @@ async function main(){
 
   const total = Object.keys(map).length;
   console.error(`\n画像あり ${total} / カタログ ${catalogKeys.size} 件`);
+  console.error(`  出どころ: 公式(jp-api) ${bySrc['公式']} / kakkon ${bySrc['kakkon']}`);
   console.error(`  新規取得 ${got} / 既存流用 ${reused} / 失敗 ${failed.length} / 不要削除 ${orphans.length}`);
+  if(ambiguous.length){
+    console.error(`  同名で複数の土地にあるため公式画像を使わなかったもの（kakkon で補完）: ${ambiguous.join('、')}`);
+  }
   if(skipped.length) console.error(`  カタログに無いためスキップ: ${skipped.length} 件`);
   if(failed.length) console.error('  失敗:\n    ' + failed.join('\n    '));
 
