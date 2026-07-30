@@ -39,6 +39,9 @@ const OUT_DIR = join(ROOT, 'public', 'images', 'items');
 const MARK_START = '// <<<AUTO-IMAGES-START>>>';
 const MARK_END = '// <<<AUTO-IMAGES-END>>>';
 const MAX_PX = 240;
+// ファイル名はカタログキーから決まるので、取得元が変わってもファイル名は変わらない。
+// 古い画像が残り続けないよう、どのURLから落としたかを記録して差分を見る。
+const SRC_JSON = join(HERE, 'image-src.json');
 
 const CAPTION_RE = /<div style="line-height: 1\.6;[^"]*">([\s\S]*?)<\/div>/;
 const IMG_RE = /(?:data-src|src)="(https:\/\/kakkon\.net\/[^"]+?\.(?:jpg|jpeg|png|webp))"/i;
@@ -137,17 +140,28 @@ async function main(){
   }catch(e){
     console.error(`  → 取得できませんでした（kakkon.net だけで進めます）: ${e.message}`);
   }
-  for(const r of jpapi){
-    if(!r.img) continue;
+  // jp-api の商品名 → カタログキー（1件に定まるものだけ）
+  const jpapiKey = (name) => {
     // jp-api の表記 → kakkon の表記 → アプリの名称 の順に寄せる
-    const asKakkon = maps.jpapiToKakkon[r.name] ?? maps.jpapiToKakkon[normName(r.name)] ?? r.name;
+    const asKakkon = maps.jpapiToKakkon[name] ?? maps.jpapiToKakkon[normName(name)] ?? name;
     const appName = resolveAlias(maps.aliases, asKakkon, null);
     const keys = byName.get(normName(appName)) || [];
-    if(keys.length === 1){
-      want.set(keys[0], { url: r.img, src: '公式' });
-    }else if(keys.length > 1){
-      // 同名で複数の土地にある商品。公式画像はどの土地のものか分からないので kakkon に任せる
-      ambiguous.push(`${r.name}（${keys.length}件）`);
+    if(keys.length === 1) return keys[0];
+    // 同名で複数の土地にある商品。公式画像はどの土地のものか分からない
+    if(keys.length > 1) ambiguous.push(`${name}（${keys.length}件）`);
+    return null;
+  };
+
+  // このアプリが数えているのは「ダイカットキーホルダー」なので、その画像だけ使う。
+  // ぬいぐるみキーチェーンは別商品で見た目も違うため、ここでは採用しない。
+  const plushOnly = [];
+  for(const r of jpapi){
+    const key = jpapiKey(r.name);
+    if(!key) continue;
+    if(r.imgDiecut){
+      want.set(key, { url: r.imgDiecut, src: '公式' });
+    }else if(r.imgPlush){
+      plushOnly.push({ key, url: r.imgPlush, name: r.name });
     }
   }
 
@@ -166,11 +180,24 @@ async function main(){
     want.set(key, { url: row.imgUrl, src: 'kakkon' });
   }
 
+  // それでも埋まらなければ、最後の手段として公式のぬいぐるみ画像を使う
+  const usedPlush = [];
+  for(const p of plushOnly){
+    if(want.has(p.key)) continue;
+    want.set(p.key, { url: p.url, src: '公式(ぬいぐるみ)' });
+    usedPlush.push(p.name);
+  }
+
   await mkdir(OUT_DIR, { recursive: true });
+
+  // 前回どのURLから落としたか
+  let prevSrc = {};
+  try { prevSrc = JSON.parse(await readFile(SRC_JSON, 'utf8')); } catch {}
+  const nextSrc = {};
 
   const map = {};           // カタログキー → ファイル名
   const failed = [];
-  const bySrc = { 公式: 0, kakkon: 0 };
+  const bySrc = { '公式': 0, 'kakkon': 0, '公式(ぬいぐるみ)': 0 };
   let got = 0, reused = 0;
 
   for(const [key, { url, src }] of want){
@@ -179,8 +206,9 @@ async function main(){
     bySrc[src]++;
     const dest = join(OUT_DIR, file);
 
-    // 出どころが変わったので、既存ファイルがあっても公式に入れ替える
-    const needFetch = force || src === '公式' || !(await fileExists(dest));
+    nextSrc[key] = url;
+    // URL が前回と違えば取得元が変わったということなので落とし直す
+    const needFetch = force || prevSrc[key] !== url || !(await fileExists(dest));
     if(!needFetch){ reused++; continue; }
     if(dryRun){ got++; continue; }
 
@@ -195,6 +223,7 @@ async function main(){
     }catch(e){
       await rm(tmp, { force: true });
       delete map[key];
+      delete nextSrc[key];
       bySrc[src]--;
       failed.push(`${key.split('__').join(' / ')} [${src}]: ${e.message}`);
     }
@@ -209,10 +238,13 @@ async function main(){
 
   const total = Object.keys(map).length;
   console.error(`\n画像あり ${total} / カタログ ${catalogKeys.size} 件`);
-  console.error(`  出どころ: 公式(jp-api) ${bySrc['公式']} / kakkon ${bySrc['kakkon']}`);
+  console.error(`  出どころ: 公式ダイカット ${bySrc['公式']} / kakkon ${bySrc['kakkon']} / 公式ぬいぐるみ ${bySrc['公式(ぬいぐるみ)']}`);
   console.error(`  新規取得 ${got} / 既存流用 ${reused} / 失敗 ${failed.length} / 不要削除 ${orphans.length}`);
   if(ambiguous.length){
-    console.error(`  同名で複数の土地にあるため公式画像を使わなかったもの（kakkon で補完）: ${ambiguous.join('、')}`);
+    console.error(`  同名で複数の土地にあるため公式画像を使わなかったもの（kakkon で補完）: ${[...new Set(ambiguous)].join('、')}`);
+  }
+  if(usedPlush.length){
+    console.error(`  ⚠️ ダイカットの画像が見つからず、ぬいぐるみの画像を使ったもの: ${usedPlush.join('、')}`);
   }
   if(skipped.length) console.error(`  カタログに無いためスキップ: ${skipped.length} 件`);
   if(failed.length) console.error('  失敗:\n    ' + failed.join('\n    '));
@@ -236,6 +268,7 @@ async function main(){
   ].join('\n');
 
   await writeFile(APP_HTML, replaceBlock(html, block), 'utf8');
+  await writeFile(SRC_JSON, JSON.stringify(nextSrc, null, 1) + '\n', 'utf8');
   console.error(`\n${APP_HTML} の画像マップを更新しました。`);
 }
 

@@ -6,6 +6,7 @@
   "description": "ちいかわ ご当地キーホルダー 所持チェックリスト",
   "scripts": {
     "dev": "node scripts/dev-server.mjs",
+    "update": "npm run update-list && npm run fetch-images",
     "update-list": "node scripts/update-catalog.mjs",
     "fetch-images": "node scripts/fetch-images.mjs"
   }

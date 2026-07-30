@@ -58,16 +58,18 @@ export async function fetchJpApi() {
     throw new Error('jp-api.com から1件も取得できませんでした。HTML構造が変わった可能性があります。');
   }
 
-  // 画像はダイカットキーホルダーを優先する（キーホルダー本体の絵柄が見えるため）
+  // 画像は種類ごとに分けて返す。呼び出し側で「キーホルダーの画像が欲しい」
+  // という区別ができるようにするため（ぬいぐるみキーチェーンは別商品）。
   return [...byName].map(([name, e]) => ({
     name,
     types: [...e.types],
-    img: e.imgs['ダイカットキーホルダー'] || e.imgs['ぬいぐるみキーチェーン'] || null,
+    imgDiecut: e.imgs['ダイカットキーホルダー'] || null,
+    imgPlush:  e.imgs['ぬいぐるみキーチェーン'] || null,
   }));
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const rows = await fetchJpApi();
-  for (const r of rows) console.log(`${r.name}\t${r.types.join('/')}`);
+  for (const r of rows) console.log(`${r.name}\t${r.types.join('/')}\t${r.imgDiecut ? 'ダイカット画像あり' : 'ダイカット画像なし'}`);
   console.error(`\nキーホルダー系ユニーク ${rows.length} 件`);
 }
