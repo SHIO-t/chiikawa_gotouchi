@@ -72,6 +72,9 @@
     .brandrow{display:flex;align-items:center;gap:12px;padding:14px 0 10px}
     h1{margin:0;font-size:19px;font-weight:700;letter-spacing:.01em;flex:1;min-width:0}
     h1 small{display:block;font-size:11px;font-weight:600;color:var(--ink-3);letter-spacing:.08em;margin-bottom:2px}
+    /* ボタンの長い表記／短い表記。狭い画面では短い方に切り替える */
+    .b-short{display:none}
+    #btnTravel,#btnDash{flex-shrink:0;white-space:nowrap}
 
     /* 進捗ヒーロー */
     .phero{display:flex;align-items:center;gap:14px;padding-bottom:12px}
@@ -181,13 +184,32 @@
     }
     .tdone .big{font-size:30px;font-weight:700;color:var(--mint-ink)}
     .tdone .sub{margin-top:6px;font-size:13px;color:var(--ink-2)}
+    /* ===== トースト（取り消し付き） =====
+       誤操作を止めるのではなく、あとから戻せるようにする。
+       普段は無視してよく、押し間違えたときだけ「取り消す」を押す。 */
     .tflash{
       position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:60;
-      background:var(--ink);color:#fff;padding:11px 18px;border-radius:999px;
+      background:var(--ink);color:#fff;padding:9px 10px 9px 18px;border-radius:999px;
       font-size:13.5px;font-weight:600;box-shadow:var(--sh-2);opacity:0;transition:opacity .2s;
-      pointer-events:none;
+      pointer-events:none;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);
     }
-    .tflash.show{opacity:1}
+    .tflash.show{opacity:1;pointer-events:auto}
+    .tflash .msg{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .tflash .undo{
+      flex-shrink:0;background:rgba(255,255,255,.16);color:#fff;border:none;
+      padding:6px 14px;border-radius:999px;font-size:13px;font-weight:700;
+    }
+    .tflash .undo:hover{background:rgba(255,255,255,.28)}
+
+    /* 最近の変更（設定シート内） */
+    .hist{list-style:none;margin:0;padding:0}
+    .hist li{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+    .hist li:last-child{border-bottom:none}
+    .hist .hn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .hist .hs{font-size:11px;color:var(--ink-3);flex-shrink:0}
+    .hist .hu{flex-shrink:0;padding:4px 10px;font-size:12px;background:var(--surface);border:1px solid var(--line-2);color:var(--ink-2)}
+    .hist .hu:hover{background:var(--surface-2);color:var(--ink)}
+    .hist .none{color:var(--ink-3);font-size:12.5px;padding:6px 0}
 
     /* ---- 設定シート ---- */
     .sheet{
@@ -243,8 +265,10 @@
     @media(max-width:560px){
       h1{font-size:16px;line-height:1.35}
       h1 small{font-size:10px}
-      /* 狭い画面では見出しを1行に収める */
+      /* 狭い画面では見出しとボタンを短くして1行に収める */
       h1 .t-long{display:none}
+      .b-long{display:none}
+      .b-short{display:inline}
       .brandrow{gap:8px;padding:12px 0 8px}
       #btnDash{padding:8px 13px;font-size:13px}
       .icon-btn{width:34px;height:34px;font-size:15px}
@@ -335,8 +359,8 @@
   <div class="wrap">
     <div class="brandrow">
       <h1><small>ご当地ちいかわ</small><span class="t-long">キーホルダー </span>コレクション</h1>
-      <button id="btnTravel" class="btn accent">🧭 旅行モード</button>
-      <button id="btnDash" class="btn ghost">ダッシュボード</button>
+      <button id="btnTravel" class="btn accent">🧭<span class="b-long"> 旅行モード</span><span class="b-short"> 旅行</span></button>
+      <button id="btnDash" class="btn ghost"><span class="b-long">ダッシュボード</span><span class="b-short">📊</span></button>
       <button id="btnSettings" class="icon-btn" aria-label="設定と同期" title="設定と同期">⚙</button>
     </div>
 
@@ -389,6 +413,12 @@
         <button id="disconnectBtn" class="btn ghost sm">同期オフ</button>
       </div>
       <p style="margin-top:8px"><span id="syncStatus" class="small">未接続</span></p>
+    </div>
+
+    <div class="sec">
+      <h3>最近の変更</h3>
+      <p>押し間違えたときはここから戻せます。直近20件まで残ります。</p>
+      <ul class="hist" id="histBox"></ul>
     </div>
 
     <div class="sec">
@@ -1290,15 +1320,6 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
   }
   const regionRankT = (r) => { const i = REGION_ORDER.indexOf(r); return i >= 0 ? i : 999; };
 
-  function travelFlash(msg){
-    let f = document.querySelector('.tflash');
-    if(!f){ f = document.createElement('div'); f.className = 'tflash'; document.body.appendChild(f); }
-    f.textContent = msg;
-    f.classList.add('show');
-    clearTimeout(f._t);
-    f._t = setTimeout(() => f.classList.remove('show'), 1700);
-  }
-
   function renderTravel(place){
     const el = document.getElementById('travel');
     const places = travelPlaces();
@@ -1401,10 +1422,11 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
           const key = card.dataset.key;
           const it = items.find(x => normalizedKey(x.region, x.pref, x.name) === key);
           if(!it) return;
+          const undoId = recordChange(it);
           it.owned = true;
           it.ownedAt = it.ownedAt || today();
           persist();
-          travelFlash(`${it.name} を追加しました`);
+          toastUndo(`${it.name} を追加しました`, undoId);
           renderTravel(localStorage.getItem(TRAVEL_KEY));
           render();       // 裏の一覧も合わせて更新
         }
@@ -1478,12 +1500,18 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
   });
 
   const sheet = document.getElementById('settings');
-  const openSheet = () => { sheet.classList.add('open'); document.body.classList.add('locked'); };
+  const openSheet = () => { renderHistory(); sheet.classList.add('open'); document.body.classList.add('locked'); };
   const closeSheet = () => { sheet.classList.remove('open'); document.body.classList.remove('locked'); };
   document.getElementById('btnSettings').addEventListener('click', openSheet);
   document.getElementById('setClose').addEventListener('click', closeSheet);
   // 背景をクリックしたら閉じる（パネル内のクリックは通す）
   sheet.addEventListener('click', (ev) => { if(ev.target === sheet) closeSheet(); });
+  // 「最近の変更」の戻すボタン
+  sheet.addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-undo]');
+    if(!b) return;
+    if(undoChange(b.dataset.undo)) toastPlain('戻しました');
+  });
   document.addEventListener('keydown', (ev) => {
     if(ev.key !== 'Escape') return;
     if(sheet.classList.contains('open')) closeSheet();
@@ -1859,6 +1887,10 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
     chk.setAttribute('aria-hidden', 'true');
 
     tile.addEventListener('click', () => {
+      // スクロール中に指が触れただけのときは切り替えない
+      if(wasDrag()) return;
+
+      const undoId = recordChange(it);   // あとから取り消せるように前の状態を残す
       it.owned = !it.owned;
       it.ownedAt = it.owned ? (it.ownedAt || today()) : null;
       tile.classList.toggle('owned', it.owned);
@@ -1867,6 +1899,7 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
       updateStats();
       repaintRegionBars();
       persist();
+      toastUndo(`${it.name} を${it.owned ? '所持' : '未所持'}にしました`, undoId);
       // 絞り込み中は、条件から外れたタイルを引っ込める
       if(!matchesView(it)) render();
     });
@@ -1878,6 +1911,129 @@ import { getFirestore, doc, onSnapshot, setDoc, getDoc } from 'https://www.gstat
   function persist(){
     try { save(); }
     catch(e){ console.error('save() failed', e); setStatus('保存に失敗（コンソール参照）','warn'); }
+  }
+
+  /* ===== 誤操作対策 =====
+     操作前に確認を挟むと毎回の手数が増えるので、
+     「動いている指のタップは無視する」＋「あとから取り消せる」で守る。 */
+
+  // スクロールやドラッグの終わりに発生するタップを弾く
+  const tapGuard = { x:0, y:0, moved:false };
+  document.addEventListener('pointerdown', (e) => {
+    tapGuard.x = e.clientX; tapGuard.y = e.clientY; tapGuard.moved = false;
+  }, true);
+  document.addEventListener('pointermove', (e) => {
+    if(tapGuard.moved) return;
+    if(Math.hypot(e.clientX - tapGuard.x, e.clientY - tapGuard.y) > 12) tapGuard.moved = true;
+  }, true);
+  const wasDrag = () => tapGuard.moved;
+
+  // 直近の変更を localStorage に残す。翌日気づいても戻せるようにするため
+  const UNDO_KEY = LS_KEY + '__undo';
+  const UNDO_MAX = 20;
+  function loadHistory(){
+    try{
+      const a = JSON.parse(localStorage.getItem(UNDO_KEY));
+      return Array.isArray(a) ? a : [];
+    }catch{ return [] }
+  }
+  let history = loadHistory();
+  function saveHistory(){
+    try{ localStorage.setItem(UNDO_KEY, JSON.stringify(history.slice(0, UNDO_MAX))); }
+    catch(e){ console.error('履歴の保存に失敗', e); }
+  }
+  let histSeq = Date.now();
+  function recordChange(it){
+    // 履歴は先頭に積むので、位置ではなく id で指す。
+    // そうしないと連続で操作したときにトーストの「取り消す」が別の商品を戻してしまう。
+    const rec = {
+      id: 'h' + (++histSeq),
+      key: normalizedKey(it.region, it.pref, it.name),
+      name: it.name,
+      pref: it.pref,
+      prev: { owned: !!it.owned, ownedAt: it.ownedAt || null },
+      at: Date.now(),
+    };
+    history.unshift(rec);
+    history = history.slice(0, UNDO_MAX);
+    saveHistory();
+    return rec.id;
+  }
+  /** 履歴の1件を元に戻す。戻したらその履歴は消す */
+  function undoChange(id){
+    const index = history.findIndex(h => h.id === id);
+    if(index < 0) return false;
+    const h = history[index];
+    const it = items.find(x => normalizedKey(x.region, x.pref, x.name) === h.key);
+    if(!it) return false;
+    it.owned = h.prev.owned;
+    it.ownedAt = h.prev.ownedAt;
+    history.splice(index, 1);
+    saveHistory();
+    persist();
+    render();
+    renderHistory();
+    // 旅行モードを開いていればそちらも合わせる
+    const trav = document.getElementById('travel');
+    if(trav && trav.style.display === 'block') renderTravel(localStorage.getItem(TRAVEL_KEY));
+    return true;
+  }
+
+  // 取り消しボタン付きのトースト
+  let toastTimer = null;
+  function toastUndo(msg, undoId){
+    let el = document.querySelector('.tflash');
+    if(!el){
+      el = document.createElement('div');
+      el.className = 'tflash';
+      el.innerHTML = '<span class="msg"></span><button class="undo" type="button">取り消す</button>';
+      document.body.appendChild(el);
+    }
+    el.querySelector('.msg').textContent = msg;
+    const btn = el.querySelector('.undo');
+    btn.classList.remove('hide');
+    btn.onclick = () => {
+      if(undoChange(undoId)) toastPlain('取り消しました');
+      else hideToast();
+    };
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 6000);
+  }
+  function toastPlain(msg){
+    const el = document.querySelector('.tflash');
+    if(!el) return;
+    el.querySelector('.msg').textContent = msg;
+    el.querySelector('.undo').classList.add('hide');
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 2000);
+  }
+  function hideToast(){
+    const el = document.querySelector('.tflash');
+    if(el) el.classList.remove('show');
+  }
+
+  // 設定シートの「最近の変更」
+  function renderHistory(){
+    const box = document.getElementById('histBox');
+    if(!box) return;
+    if(!history.length){
+      box.innerHTML = '<div class="none">まだ変更はありません。</div>';
+      return;
+    }
+    const fmt = (t) => {
+      const d = new Date(t);
+      return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    };
+    box.innerHTML = history.map((h, i) => `
+      <li>
+        <span class="hn">${esc2(h.pref ? h.pref + ' ' : '')}${esc2(h.name)}
+          <span class="hs">→ ${h.prev.owned ? '未所持にした' : '所持にした'}</span>
+        </span>
+        <span class="hs">${fmt(h.at)}</span>
+        <button class="hu btn" type="button" data-undo="${esc2(h.id)}">戻す</button>
+      </li>`).join('');
   }
 
   // 地域ヘッダの進捗だけを描き直す（全体を作り直さずに済ませる）
